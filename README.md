@@ -1,6 +1,6 @@
 # Comphony
 
-Comphony는 `Symphony`와 `Linear`를 기반으로 회사처럼 운영되는 작업 구조를 설계하고 문서화하는 저장소다.
+Comphony는 `Symphony`로 회사 구조를 구축하고, 그 운영 방식을 `Linear`와 workflow 문서로 정리하는 저장소다.
 
 이 저장소의 목적은 세 가지다.
 
