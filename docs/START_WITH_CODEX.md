@@ -153,6 +153,7 @@ Codex는 실제로 사람이 다시 실행할 수 있게 만들어야 한다.
 최소 결과물:
 
 - `repos`, `workspaces`, `workflows` 구조
+- `.env` 또는 동등한 로컬 환경 설정
 - 실행 스크립트 또는 실행 명령
 - 실제 workflow 파일 경로
 - workspace 루트 경로
@@ -242,6 +243,7 @@ Codex는 아래가 모두 참일 때까지 계속 도와야 한다.
 
 - `MISSION.md`
 - `repos/`, `workspaces/`, `workflows/`
+- `.env`
 - 실제 workflow 파일들
 - 실행 스크립트
 - 프로젝트 구조 문서
@@ -270,3 +272,4 @@ Codex는 아래가 모두 참일 때까지 계속 도와야 한다.
 - [SCENARIO_MATRIX.md](SCENARIO_MATRIX.md)
 - [ISSUE_LIFECYCLE.md](ISSUE_LIFECYCLE.md)
 - [WORKFLOW_PARTS.md](WORKFLOW_PARTS.md)
+- [../tests/README.md](../tests/README.md)

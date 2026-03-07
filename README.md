@@ -151,6 +151,21 @@ That means:
 - each person keeps their own local repos, workspaces, and runtime workflow files
 - actual product repos can still have their own Git history and their own commits
 
+## Setup Validation
+
+Comphony now includes a simple local setup test flow:
+
+- `./tests/preflight.sh`
+  - checks the repo structure right after clone
+- `./scripts/init-local-setup.sh`
+  - creates `.env` and `MISSION.md` from templates if needed
+- `./tests/validate-setup.sh`
+  - checks that Codex actually finished the setup
+- `./scripts/reset-local-state.sh --confirm`
+  - clears local generated state so you can test the setup flow again
+
+The local environment template is tracked as [.env.example](.env.example), while `.env` itself stays ignored.
+
 ## Start Here
 
 - [Start With Codex](docs/START_WITH_CODEX.md)
@@ -160,6 +175,7 @@ That means:
 - [Scenario Matrix](docs/SCENARIO_MATRIX.md)
 - [Issue Lifecycle](docs/ISSUE_LIFECYCLE.md)
 - [Workflow Parts](docs/WORKFLOW_PARTS.md)
+- [Setup Test Flow](tests/README.md)
 
 ## In One Sentence
 
