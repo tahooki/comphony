@@ -16,7 +16,8 @@ workspace:
 hooks:
   after_create: |
     # Recommended source repo: file:///Users/you/Documents/comphony/repos/project-admin
-    git clone --depth 1 file://<ABS_PROJECT_ADMIN_REPO_PATH> .
+    # Replace <DEFAULT_BRANCH> with the repo's default branch, such as main.
+    git clone --depth 1 --branch <DEFAULT_BRANCH> file://<ABS_PROJECT_ADMIN_REPO_PATH> .
 agent:
   max_concurrent_agents: 1
   max_turns: 12

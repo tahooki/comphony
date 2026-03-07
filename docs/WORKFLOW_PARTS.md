@@ -58,7 +58,7 @@ workspace:
 ```yaml
 hooks:
   after_create: |
-    git clone --depth 1 file:///Users/you/Documents/comphony/repos/repo_a .
+    git clone --depth 1 --branch main file:///Users/you/Documents/comphony/repos/repo_a .
     pnpm install --frozen-lockfile
 ```
 

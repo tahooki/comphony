@@ -82,7 +82,7 @@ workspace:
 
 hooks:
   after_create: |
-    git clone --depth 1 file:///Users/you/Documents/comphony/repos/product-foo .
+    git clone --depth 1 --branch main file:///Users/you/Documents/comphony/repos/product-foo .
     pnpm install --frozen-lockfile
 
 codex:
@@ -95,7 +95,11 @@ You are working on Linear issue {{ issue.identifier }}.
 실행 예시:
 
 ```bash
-/path/to/symphony/bin/symphony /Users/you/Documents/comphony/workflows/WORKFLOW.product-foo.md
+cd /path/to/symphony/elixir
+mise exec -- ./bin/symphony \
+  --i-understand-that-this-will-be-running-without-the-usual-guardrails \
+  --port 4000 \
+  /Users/you/Documents/comphony/workflows/WORKFLOW.product-foo.md
 ```
 
 이 설정의 의미는 간단하다.
@@ -204,7 +208,7 @@ Symphony는 보통 원본 repo를 직접 수정하지 않는다. 대신 `이슈�
 ```yaml
 hooks:
   after_create: |
-    git clone --depth 1 file:///Users/you/Documents/comphony/repos/product-foo .
+    git clone --depth 1 --branch main file:///Users/you/Documents/comphony/repos/product-foo .
     pnpm install --frozen-lockfile
 ```
 

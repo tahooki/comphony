@@ -17,7 +17,8 @@ workspace:
 hooks:
   after_create: |
     # Recommended source repo: file:///Users/you/Documents/comphony/repos/<repo-slug>
-    git clone --depth 1 file://<ABS_REPO_PATH> .
+    # Replace <DEFAULT_BRANCH> with the repo's default branch, such as main.
+    git clone --depth 1 --branch <DEFAULT_BRANCH> file://<ABS_REPO_PATH> .
     if command -v corepack >/dev/null 2>&1; then
       corepack enable || true
     fi

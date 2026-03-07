@@ -96,7 +96,10 @@ else
   warn "SYMPHONY_BIN is not set"
 fi
 
-mapfile -t workflow_files < <(find "${COMPHONY_WORKFLOW_ROOT}" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort)
+workflow_files=()
+while IFS= read -r workflow; do
+  workflow_files+=("${workflow}")
+done < <(find "${COMPHONY_WORKFLOW_ROOT}" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort)
 
 if [[ "${#workflow_files[@]}" -eq 0 ]]; then
   fail "no runnable workflow files found in ${COMPHONY_WORKFLOW_ROOT}"

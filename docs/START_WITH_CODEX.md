@@ -160,6 +160,16 @@ Codex는 실제로 사람이 다시 실행할 수 있게 만들어야 한다.
 - 필요한 환경 변수 설명
 - 대시보드 접근 URL
 
+Symphony가 Elixir `bin/symphony` 형태로 설치되어 있다면, 실행 명령은 보통 아래처럼 잡는 편이 안전하다.
+
+```bash
+cd /path/to/symphony/elixir
+mise exec -- ./bin/symphony \
+  --i-understand-that-this-will-be-running-without-the-usual-guardrails \
+  --port 4000 \
+  /Users/you/Documents/comphony/workflows/WORKFLOW.product-core.dev.md
+```
+
 ### Phase 6. 스모크 테스트
 
 Codex는 최소 한 번은 실제 작동 경로를 검증해야 한다.

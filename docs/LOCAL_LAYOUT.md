@@ -125,7 +125,7 @@ comphony/
 ```yaml
 hooks:
   after_create: |
-    git clone --depth 1 file:///Users/you/Documents/comphony/repos/product-core .
+    git clone --depth 1 --branch main file:///Users/you/Documents/comphony/repos/product-core .
 ```
 
 ## 6. 언제 이 규칙을 깨도 되는가

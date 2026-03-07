@@ -87,7 +87,7 @@ workspace:
 
 hooks:
   after_create: |
-    git clone --depth 1 file:///Users/you/Documents/comphony/repos/product-foo .
+    git clone --depth 1 --branch main file:///Users/you/Documents/comphony/repos/product-foo .
 ```
 
 의미:
@@ -112,8 +112,15 @@ hooks:
 예:
 
 ```bash
-/path/to/symphony/bin/symphony /Users/you/Documents/comphony/workflows/WORKFLOW.repo_a.md
-/path/to/symphony/bin/symphony /Users/you/Documents/comphony/workflows/WORKFLOW.repo_b.md
+cd /path/to/symphony/elixir
+mise exec -- ./bin/symphony \
+  --i-understand-that-this-will-be-running-without-the-usual-guardrails \
+  --port 4000 \
+  /Users/you/Documents/comphony/workflows/WORKFLOW.repo_a.md
+mise exec -- ./bin/symphony \
+  --i-understand-that-this-will-be-running-without-the-usual-guardrails \
+  --port 4001 \
+  /Users/you/Documents/comphony/workflows/WORKFLOW.repo_b.md
 ```
 
 ## 6. Workflow 파일은 여러 개 만들 수 있는가
@@ -177,7 +184,7 @@ workspace:
 
 hooks:
   after_create: |
-    git clone --depth 1 file:///Users/you/Documents/comphony/repos/repo_a .
+    git clone --depth 1 --branch main file:///Users/you/Documents/comphony/repos/repo_a .
     corepack enable
     pnpm install --frozen-lockfile
 
@@ -208,7 +215,7 @@ workspace:
 
 hooks:
   after_create: |
-    git clone --depth 1 file:///Users/you/Documents/comphony/repos/repo_b .
+    git clone --depth 1 --branch main file:///Users/you/Documents/comphony/repos/repo_b .
     bundle install
 
 codex:
@@ -278,8 +285,15 @@ Validation:
 예:
 
 ```bash
-/path/to/symphony/bin/symphony --port 4000 /Users/you/Documents/comphony/workflows/WORKFLOW.repo_a.md
-/path/to/symphony/bin/symphony --port 4001 /Users/you/Documents/comphony/workflows/WORKFLOW.repo_b.md
+cd /path/to/symphony/elixir
+mise exec -- ./bin/symphony \
+  --i-understand-that-this-will-be-running-without-the-usual-guardrails \
+  --port 4000 \
+  /Users/you/Documents/comphony/workflows/WORKFLOW.repo_a.md
+mise exec -- ./bin/symphony \
+  --i-understand-that-this-will-be-running-without-the-usual-guardrails \
+  --port 4001 \
+  /Users/you/Documents/comphony/workflows/WORKFLOW.repo_b.md
 ```
 
 ## 13. 요약
