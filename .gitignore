@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# Local environment and secrets
+.env
+.env.*
+*.local
+
+# Local mission file derived from the template
+MISSION.md
+
+# Runtime leftovers
+*.log
+*.pid
+tmp/
+
+# Local source repos cloned or created by each user
+repos/*
+!repos/.gitkeep
+
+# Issue-specific workspaces
+workspaces/*
+!workspaces/.gitkeep
+
+# Real executable workflow files for the local machine
+workflows/*
+!workflows/.gitkeep

@@ -66,6 +66,7 @@ comphony/
 
 - `docs/workflows/`는 샘플 템플릿 위치
 - 루트 `workflows/`는 실제 실행용 workflow 위치
+- 루트 `repos/`, `workspaces/`, `workflows/`의 실제 내용은 보통 Git에서 무시한다
 
 ## 3. 이름 규칙
 
@@ -146,3 +147,21 @@ hooks:
 - workflow root: `/Users/you/Documents/comphony/workflows`
 
 그리고 `projects`라는 이름은 Linear 안에서만 쓴다.
+
+## 8. 왜 `.gitignore`가 필요한가
+
+이 저장소를 클론한 뒤에는 사람마다 아래가 달라진다.
+
+- `MISSION.md`
+- `repos/` 안의 실제 repo들
+- `workspaces/` 안의 이슈별 작업 폴더
+- `workflows/` 안의 로컬 실행용 workflow 파일
+
+이 파일들은 개인 환경과 실행 상태를 반영하므로 보통 커밋 대상이 아니다.
+
+그래서 `comphony`는 아래 원칙을 따른다.
+
+- 문서와 샘플 템플릿은 추적한다
+- 로컬 실행 산출물은 무시한다
+
+즉 공유할 것은 `docs/`와 템플릿이고, 실행하면서 생기는 것은 `.gitignore`로 숨기는 구조다.

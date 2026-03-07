@@ -32,6 +32,15 @@ Comphony는 `Symphony`로 회사 구조를 구축하고, 그 운영 방식을 `L
   - 실제 실행용 workflow 파일 위치
   - `docs/workflows`는 샘플 템플릿
 
+로컬 전용 파일은 Git에 올라가지 않도록 설계했다.
+
+- `MISSION.md`
+- `repos/*`
+- `workspaces/*`
+- `workflows/*`
+
+즉 실제 개인 설정과 실행 산출물은 루트 [.gitignore](/Users/tahooki/Documents/comphony/.gitignore)로 무시되고, 문서와 샘플만 추적된다.
+
 ## 빠른 시작
 
 `comphony`를 클론한 뒤 Codex로 실제 셋업까지 진행하려면 아래 순서로 시작하면 된다.
