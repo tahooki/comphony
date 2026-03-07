@@ -1,57 +1,157 @@
 # Comphony
 
-Comphony는 `Symphony`로 회사 구조를 구축하고, 그 운영 방식을 `Linear`와 workflow 문서로 정리하는 저장소다.
+Build an AI company on top of `Symphony`, `Linear`, and `Codex`.
 
-이 저장소의 목적은 세 가지다.
+Clone this repo, open Codex, and ask it to set everything up for you in one shot.
+Comphony is designed as a control repo for turning a blank machine into a working AI operating system where ideas become projects, projects become repos, and Linear issues become real execution.
 
-- 아이디어, 프로젝트 관리, 제품 실행을 어떤 Linear 프로젝트 구조로 나눌지 정리한다.
-- PM, Research, Design, Dev 같은 역할을 어떤 workflow 조합으로 운영할지 정리한다.
-- 새 제품이나 새 팀을 만들 때 재사용할 수 있는 운영 문서와 workflow 샘플을 제공한다.
+## What This Builds
 
-## 이 저장소가 다루는 것
+Comphony is not just a docs repo. It is a model for an AI-native company structure.
 
-- `Idea Lab -> Project Managing -> Product - <이름>` 형태의 회사형 운영 구조
-- Symphony workflow 설계 원칙
-- Linear 프로젝트와 상태 설계
-- 역할별 relay 운영 방식
-- 코드 작업, 리서치 작업, project-admin 작업 예시
+The default company looks like this:
 
-## 디렉터리 구조
+- `Idea Lab`
+  - collect ideas
+  - refine requests
+  - research opportunities
+- `Project Managing`
+  - create new repos
+  - create new Linear projects
+  - generate new workflow files
+  - bootstrap new operating lanes
+- `Product - <Name>`
+  - run real product work
+  - split work across PM, Research, Design, and Dev if needed
+- optional `Ops` or `Maintenance` lanes
+  - handle operational work, automation, and production follow-up
 
-- [docs](docs)
-  - Symphony 운영 가이드
-  - 회사 구조 문서
-  - issue lifecycle 설명
-  - workflow 샘플 모음
-- [repos](repos)
-  - 원본 저장소 모음
-  - canonical clone 또는 canonical checkout 위치
-- [workspaces](workspaces)
-  - 이슈별 실제 작업 폴더
-- [workflows](workflows)
-  - 실제 실행용 workflow 파일 위치
-  - `docs/workflows`는 샘플 템플릿
+In other words: this repo helps you build a company made of projects, roles, workflows, and issue-driven execution.
 
-로컬 전용 파일은 Git에 올라가지 않도록 설계했다.
+## How It Works
+
+Comphony wires together five layers:
+
+- `Linear`
+  - the task system
+  - where work is requested and tracked
+- `Symphony`
+  - the orchestrator
+  - watches Linear and starts work
+- `Codex`
+  - the execution agent
+  - reads the docs, creates setup files, and performs the work
+- `Workflows`
+  - define which Linear project to watch
+  - define which role to play
+  - define which repo to prepare and how
+- `Workspaces`
+  - isolated issue-specific folders where actual work happens
+
+```mermaid
+flowchart LR
+    A["Linear issue"] --> B["Symphony"]
+    B --> C["Workflow"]
+    C --> D["Workspace"]
+    D --> E["Codex execution"]
+    E --> F["Code change, report, or handoff"]
+```
+
+## The Company Model
+
+The recommended operating model is simple and scalable:
+
+```mermaid
+flowchart TD
+    A["Idea Lab"] --> B["Project Managing"]
+    B --> C["Product - Alpha"]
+    B --> D["Product - Beta"]
+    C --> E["Research / Design / Dev relay"]
+    D --> F["Research / Design / Dev relay"]
+```
+
+That means:
+
+- ideas start in `Idea Lab`
+- approved work moves into `Project Managing`
+- new products get their own Linear projects, repos, and workflows
+- day-to-day execution happens in product-specific lanes
+
+This gives you a structure that feels closer to an actual company than a single automation script.
+
+## One-Shot Setup With Codex
+
+You should be able to clone this repo and simply say:
+
+```text
+Read this repo and set it up for me.
+Create any missing local setup files yourself, including MISSION.md.
+Keep going until Linear + Symphony is working end-to-end.
+```
+
+From there, Codex is expected to:
+
+1. read `AGENTS.md` and the setup docs
+2. create `MISSION.md` automatically if it does not exist
+3. prepare the local directory layout
+4. connect Symphony to Linear
+5. create the required Linear projects and states
+6. generate runnable workflow files
+7. verify the system with a smoke test issue
+
+The goal is not to stop at explanation. The goal is to reach a working state where you can create a Linear issue and watch execution start.
+
+## Repository Layout
+
+Comphony standardizes the local machine layout like this:
+
+```text
+comphony/
+  AGENTS.md
+  MISSION.md
+  MISSION.template.md
+  docs/
+  repos/
+  workspaces/
+  workflows/
+```
+
+What each folder means:
+
+- `docs/`
+  - operating docs and workflow templates
+- `repos/`
+  - canonical source repos
+- `workspaces/`
+  - issue-specific working directories
+- `workflows/`
+  - real runnable workflow files for the local machine
+
+Naming matters:
+
+- use `repos` for source repos
+- use `workspaces` for isolated issue execution
+- use `workflows` for runnable setup files
+- keep `projects` as a Linear concept, not a filesystem folder name
+
+## Local-Only State Stays Local
+
+This repo is designed so each user can run their own local setup without polluting the shared repo.
+
+The following are intentionally ignored:
 
 - `MISSION.md`
 - `repos/*`
 - `workspaces/*`
 - `workflows/*`
 
-즉 실제 개인 설정과 실행 산출물은 루트 [.gitignore](/Users/tahooki/Documents/comphony/.gitignore)로 무시되고, 문서와 샘플만 추적된다.
+That means:
 
-## 빠른 시작
+- the docs and templates are shared
+- each person keeps their own local repos, workspaces, and runtime workflow files
+- actual product repos can still have their own Git history and their own commits
 
-`comphony`를 클론한 뒤 Codex로 실제 셋업까지 진행하려면 아래 순서로 시작하면 된다.
-
-1. [AGENTS.md](AGENTS.md)를 읽는다.
-2. [Local Layout](docs/LOCAL_LAYOUT.md) 기준으로 `repos`, `workspaces`, `workflows` 구조를 이해한다.
-3. [Start With Codex](docs/START_WITH_CODEX.md)를 읽고 Codex에게 셋업을 맡긴다.
-
-사람이 `MISSION.md`를 먼저 만들 필요는 없다. 없으면 Codex가 [MISSION.template.md](MISSION.template.md)를 바탕으로 직접 생성한다.
-
-## 핵심 문서
+## Start Here
 
 - [Start With Codex](docs/START_WITH_CODEX.md)
 - [Local Layout](docs/LOCAL_LAYOUT.md)
@@ -61,6 +161,6 @@ Comphony는 `Symphony`로 회사 구조를 구축하고, 그 운영 방식을 `L
 - [Issue Lifecycle](docs/ISSUE_LIFECYCLE.md)
 - [Workflow Parts](docs/WORKFLOW_PARTS.md)
 
-## 한 줄 설명
+## In One Sentence
 
-`Comphony`는 Symphony로 구축하는 회사 운영 구조와 프로젝트 실행 체계를 정리한 레포다.
+Comphony is a repo for building an AI company with Symphony, then using Codex to set up the whole operating system end-to-end.
