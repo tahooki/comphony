@@ -24,8 +24,17 @@ Comphony는 `Symphony`로 회사 구조를 구축하고, 그 운영 방식을 `L
   - issue lifecycle 설명
   - workflow 샘플 모음
 
+## 빠른 시작
+
+`comphony`를 클론한 뒤 Codex로 실제 셋업까지 진행하려면 아래 순서로 시작하면 된다.
+
+1. [AGENTS.md](AGENTS.md)를 읽는다.
+2. [MISSION.template.md](MISSION.template.md)를 바탕으로 `MISSION.md`를 만든다.
+3. [Start With Codex](docs/START_WITH_CODEX.md)를 읽고 Codex에게 셋업을 맡긴다.
+
 ## 핵심 문서
 
+- [Start With Codex](docs/START_WITH_CODEX.md)
 - [Symphony Basics](docs/SYMPHONY_BASICS.md)
 - [Comphony Company Model](docs/COMPHONY_COMPANY_MODEL.md)
 - [Scenario Matrix](docs/SCENARIO_MATRIX.md)
