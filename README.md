@@ -26,6 +26,7 @@ Comphony는 `Symphony`로 회사 구조를 구축하고, 그 운영 방식을 `L
 
 ## 핵심 문서
 
+- [Symphony Basics](docs/SYMPHONY_BASICS.md)
 - [Comphony Company Model](docs/COMPHONY_COMPANY_MODEL.md)
 - [Scenario Matrix](docs/SCENARIO_MATRIX.md)
 - [Issue Lifecycle](docs/ISSUE_LIFECYCLE.md)
