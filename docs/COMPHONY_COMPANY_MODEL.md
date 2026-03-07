@@ -112,6 +112,21 @@ flowchart TD
 
 즉 하나의 제품 프로젝트 안에 여러 역할이 공존할 수 있지만, 충돌을 막기 위해 상태를 나눠서 릴레이 방식으로 운영한다.
 
+### 추천 로컬 폴더 구조
+
+이 회사 구조를 파일 시스템에 반영할 때는 아래를 권장한다.
+
+- `repos/`
+  - 제품 repo와 관리용 repo의 원본 위치
+- `workspaces/`
+  - 이슈별 작업공간
+- `workflows/`
+  - 실제 실행용 workflow 파일
+- `projects`
+  - 파일 시스템 이름이 아니라 Linear 프로젝트 이름으로만 사용
+
+즉 부서 개념은 Linear에 두고, 파일 시스템에는 `repos/workspaces/workflows`만 두는 편이 가장 명확하다.
+
 ## 4. 부서별 추천 상태 구조
 
 ### Idea Lab

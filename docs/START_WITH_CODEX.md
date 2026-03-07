@@ -10,13 +10,40 @@
 - Symphony를 실행할 수 있게 하고
 - 최종적으로는 Linear 이슈만 만들면 작업이 시작되도록 만든다
 
+## 0. 추천 로컬 폴더 구조
+
+`comphony`는 아래 구조를 표준으로 삼는 편이 가장 낫다.
+
+```text
+comphony/
+  AGENTS.md
+  MISSION.md
+  docs/
+  repos/
+  workspaces/
+  workflows/
+```
+
+의미:
+
+- `repos/` = 원본 저장소
+- `workspaces/` = 이슈별 작업 폴더
+- `workflows/` = 실제 실행용 workflow 파일
+- `docs/workflows/` = 샘플 템플릿
+
+중요한 규칙:
+
+- 파일 시스템 이름은 `repos`를 쓴다
+- `projects`는 Linear 프로젝트 이름으로만 쓴다
+
 ## 1. 가장 먼저 해야 할 일
 
 ### 사람
 
 1. 이 저장소를 클론한다.
 2. [MISSION.template.md](../MISSION.template.md)를 참고해 `MISSION.md`를 만든다.
-3. Codex에게 아래처럼 요청한다.
+3. `repos`, `workspaces`, `workflows` 구조를 확인한다.
+4. Codex에게 아래처럼 요청한다.
 
 ```text
 Read AGENTS.md, docs/START_WITH_CODEX.md, and MISSION.md.
@@ -43,6 +70,7 @@ Codex는 먼저 이번 셋업의 범위를 명확히 해야 한다.
 
 최소 확인 항목:
 
+- `comphony` 루트와 `repos`, `workspaces`, `workflows` 경로
 - 어떤 Linear workspace/team을 쓸지
 - 어떤 Linear 프로젝트들을 만들지
 - 어떤 repo들을 작업 대상으로 연결할지
@@ -55,6 +83,7 @@ Codex는 먼저 이번 셋업의 범위를 명확히 해야 한다.
 
 Codex는 아래를 확인한다.
 
+- 표준 로컬 폴더 구조가 있는지
 - Symphony 설치 여부
 - `LINEAR_API_KEY` 유무
 - GitHub / Git / package manager 사용 가능 여부
@@ -96,6 +125,9 @@ Codex는 역할과 repo 전략에 맞는 workflow 파일을 만든다.
 - `WORKFLOW.dev.md`
 - `WORKFLOW.project-admin.md`
 
+실행용 workflow 파일은 `comphony/workflows/` 아래에 두는 것을 기본값으로 한다.
+`docs/workflows/`는 참고용 샘플 위치다.
+
 이때 workflow는 반드시 아래를 포함해야 한다.
 
 - `project_slug`
@@ -110,6 +142,7 @@ Codex는 실제로 사람이 다시 실행할 수 있게 만들어야 한다.
 
 최소 결과물:
 
+- `repos`, `workspaces`, `workflows` 구조
 - 실행 스크립트 또는 실행 명령
 - 실제 workflow 파일 경로
 - workspace 루트 경로
@@ -188,15 +221,17 @@ Codex는 아래가 모두 참일 때까지 계속 도와야 한다.
 2. Linear와 API 수준으로 연결된다.
 3. 필요한 Linear 프로젝트와 상태가 준비되어 있다.
 4. 적어도 하나의 실제 workflow가 repo 또는 research 작업과 연결되어 있다.
-5. 실행 스크립트 또는 실행 명령이 남아 있다.
-6. 테스트 이슈 경로가 검증되었다.
-7. 사용자가 "이제 이슈만 만들면 된다"는 상태를 이해할 수 있게 문서가 정리되어 있다.
+5. 실행용 workflow 파일이 `workflows/` 아래에 있다.
+6. 실행 스크립트 또는 실행 명령이 남아 있다.
+7. 테스트 이슈 경로가 검증되었다.
+8. 사용자가 "이제 이슈만 만들면 된다"는 상태를 이해할 수 있게 문서가 정리되어 있다.
 
 ## 6. 기본 산출물
 
 셋업이 끝나면 최소 아래가 남아야 한다.
 
 - `MISSION.md`
+- `repos/`, `workspaces/`, `workflows/`
 - 실제 workflow 파일들
 - 실행 스크립트
 - 프로젝트 구조 문서

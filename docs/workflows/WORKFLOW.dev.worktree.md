@@ -12,9 +12,11 @@ tracker:
     - Canceled
     - Duplicate
 workspace:
+  # Recommended: /Users/you/Documents/comphony/workspaces/<repo-slug>
   root: "<ABS_WORKTREE_ROOT>"
 hooks:
   after_create: |
+    # Recommended canonical repo: /Users/you/Documents/comphony/repos/<repo-slug>
     ROOT_REPO="<ABS_CANONICAL_REPO_PATH>"
     BRANCH="symphony-$(basename "$PWD")"
     git -C "$ROOT_REPO" fetch origin
@@ -28,6 +30,7 @@ hooks:
       npm ci --cache "${HOME}/.npm" --prefer-offline
     fi
   before_remove: |
+    # Same canonical repo path as above
     ROOT_REPO="<ABS_CANONICAL_REPO_PATH>"
     git -C "$ROOT_REPO" worktree remove --force "$PWD" || true
 agent:

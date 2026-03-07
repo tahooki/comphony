@@ -11,9 +11,11 @@ tracker:
     - Canceled
     - Duplicate
 workspace:
+  # Recommended: /Users/you/Documents/comphony/workspaces/project-admin
   root: "<ABS_WORKSPACE_ROOT>/project-admin"
 hooks:
   after_create: |
+    # Recommended source repo: file:///Users/you/Documents/comphony/repos/project-admin
     git clone --depth 1 file://<ABS_PROJECT_ADMIN_REPO_PATH> .
 agent:
   max_concurrent_agents: 1

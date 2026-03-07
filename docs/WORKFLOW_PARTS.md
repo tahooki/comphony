@@ -41,12 +41,13 @@ tracker:
 
 ```yaml
 workspace:
-  root: /Users/tahooki/Documents/symphony-workspaces/repo_a
+  root: /Users/you/Documents/comphony/workspaces/repo_a
 ```
 
 결과:
 
 - `ABC-123` 이슈가 잡히면 보통 `/Users/.../repo_a/ABC-123` 같은 폴더가 만들어진다.
+- 권장 위치는 `/Users/you/Documents/comphony/workspaces/<repo-slug>/<issue-id>`다.
 
 ## 3. `hooks.after_create`
 
@@ -57,7 +58,7 @@ workspace:
 ```yaml
 hooks:
   after_create: |
-    git clone --depth 1 file:///Users/tahooki/Documents/git/repo_a .
+    git clone --depth 1 file:///Users/you/Documents/comphony/repos/repo_a .
     pnpm install --frozen-lockfile
 ```
 
@@ -74,6 +75,13 @@ hooks:
 - repo를 복제할 수도 있다
 - 아무것도 복제하지 않을 수도 있다
 - 템플릿 파일만 넣을 수도 있다
+
+권장 표준:
+
+- 원본 저장소 루트: `/Users/you/Documents/comphony/repos`
+- 작업공간 루트: `/Users/you/Documents/comphony/workspaces`
+- 실행용 workflow 루트: `/Users/you/Documents/comphony/workflows`
+- `docs/workflows/`는 샘플, `workflows/`는 실사용 파일
 
 ## 역할은 어디에 설정하나
 

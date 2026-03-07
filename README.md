@@ -23,6 +23,14 @@ Comphony는 `Symphony`로 회사 구조를 구축하고, 그 운영 방식을 `L
   - 회사 구조 문서
   - issue lifecycle 설명
   - workflow 샘플 모음
+- [repos](repos)
+  - 원본 저장소 모음
+  - canonical clone 또는 canonical checkout 위치
+- [workspaces](workspaces)
+  - 이슈별 실제 작업 폴더
+- [workflows](workflows)
+  - 실제 실행용 workflow 파일 위치
+  - `docs/workflows`는 샘플 템플릿
 
 ## 빠른 시작
 
@@ -30,11 +38,13 @@ Comphony는 `Symphony`로 회사 구조를 구축하고, 그 운영 방식을 `L
 
 1. [AGENTS.md](AGENTS.md)를 읽는다.
 2. [MISSION.template.md](MISSION.template.md)를 바탕으로 `MISSION.md`를 만든다.
-3. [Start With Codex](docs/START_WITH_CODEX.md)를 읽고 Codex에게 셋업을 맡긴다.
+3. [Local Layout](docs/LOCAL_LAYOUT.md) 기준으로 `repos`, `workspaces`, `workflows` 구조를 이해한다.
+4. [Start With Codex](docs/START_WITH_CODEX.md)를 읽고 Codex에게 셋업을 맡긴다.
 
 ## 핵심 문서
 
 - [Start With Codex](docs/START_WITH_CODEX.md)
+- [Local Layout](docs/LOCAL_LAYOUT.md)
 - [Symphony Basics](docs/SYMPHONY_BASICS.md)
 - [Comphony Company Model](docs/COMPHONY_COMPANY_MODEL.md)
 - [Scenario Matrix](docs/SCENARIO_MATRIX.md)

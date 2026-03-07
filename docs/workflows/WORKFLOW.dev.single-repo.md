@@ -12,9 +12,11 @@ tracker:
     - Canceled
     - Duplicate
 workspace:
+  # Recommended: /Users/you/Documents/comphony/workspaces/<repo-slug>
   root: "<ABS_WORKSPACE_ROOT>"
 hooks:
   after_create: |
+    # Recommended source repo: file:///Users/you/Documents/comphony/repos/<repo-slug>
     git clone --depth 1 file://<ABS_REPO_PATH> .
     if command -v corepack >/dev/null 2>&1; then
       corepack enable || true

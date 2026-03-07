@@ -145,3 +145,14 @@
 - dev workflow 1개
 
 그 다음 필요할 때 PM/Research/Design workflow를 추가하는 편이 안정적이다.
+
+### 로컬 폴더 이름은 `repos`로 고정하라
+
+추천:
+
+- `repos/` = 원본 저장소
+- `workspaces/` = 이슈별 작업공간
+- `workflows/` = 실행용 workflow 파일
+- `projects` = Linear 프로젝트 이름
+
+이렇게 두면 파일 시스템 개념과 업무 관리 개념이 섞이지 않는다.

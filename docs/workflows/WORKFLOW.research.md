@@ -10,6 +10,7 @@ tracker:
     - Canceled
     - Duplicate
 workspace:
+  # Recommended: /Users/you/Documents/comphony/workspaces/<project-or-repo-slug>
   root: "<ABS_WORKSPACE_ROOT>/research"
 hooks:
   after_create: |

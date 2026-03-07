@@ -16,7 +16,21 @@
 - Primary objective: `Symphony와 Linear를 연결해서 이슈만 만들면 작업이 시작되는 구조 만들기`
 - Desired end state: `Idea Lab, Project Managing, Product - Core 프로젝트와 dev/research/project-admin workflow가 작동`
 
-## 2. Linear Setup
+## 2. Local Layout
+
+- Comphony root path:
+- Repo root:
+- Workspace root:
+- Workflow root:
+
+예:
+
+- Comphony root path: `/Users/you/Documents/comphony`
+- Repo root: `/Users/you/Documents/comphony/repos`
+- Workspace root: `/Users/you/Documents/comphony/workspaces`
+- Workflow root: `/Users/you/Documents/comphony/workflows`
+
+## 3. Linear Setup
 
 - Linear workspace/team:
 - Use existing workspace or create new projects:
@@ -32,7 +46,7 @@
 - Project Managing: `Requested`, `Provisioning`, `Verification`, `Done`
 - Product - Core: `Planning`, `Research`, `Design`, `Todo`, `In Progress`, `Rework`, `Human Review`, `Merging`, `Done`
 
-## 3. Repo Targets
+## 4. Repo Targets
 
 - Symphony repo path:
 - Product repo path(s):
@@ -43,11 +57,11 @@
 
 - Symphony repo path: `/Users/you/Documents/symphony`
 - Product repo path(s):
-  - `/Users/you/Documents/git/product-core`
+  - `/Users/you/Documents/comphony/repos/product-core`
 - Research-only project without repo?: `yes`
-- Project-admin repo path: `/Users/you/Documents/git/project-admin`
+- Project-admin repo path: `/Users/you/Documents/comphony/repos/project-admin`
 
-## 4. Workflow Strategy
+## 5. Workflow Strategy
 
 - Do you want single-repo dev only, or role relay?:
 - Roles to enable:
@@ -62,14 +76,14 @@
   - `git worktree`
 - Package/bootstrap strategy:
 
-## 5. Runtime
+## 6. Runtime
 
 - Where should workflow files live?:
 - How should Symphony be started?:
 - Preferred dashboard port:
 - Where should run scripts live?:
 
-## 6. Smoke Test
+## 7. Smoke Test
 
 - Create a verification issue automatically?:
 - Example issue title:
@@ -81,10 +95,11 @@
 - Example issue title: `Add verification marker to dashboard`
 - Expected first visible behavior: `issue moves from Todo to In Progress and dashboard shows a running agent`
 
-## 7. Acceptance Criteria
+## 8. Acceptance Criteria
 
 Codex should not stop until these are complete.
 
+- [ ] Standard local layout exists under the Comphony root
 - [ ] Symphony runs locally
 - [ ] Linear API connection works
 - [ ] Linear projects and states are prepared
@@ -93,14 +108,14 @@ Codex should not stop until these are complete.
 - [ ] At least one smoke-test issue path is verified
 - [ ] Final docs reflect the actual local paths and project names
 
-## 8. Constraints
+## 9. Constraints
 
 - Avoid changing unrelated repos:
 - Prefer private or public GitHub repos:
 - Any repositories or projects to exclude:
 - Any secrets handling rule:
 
-## 9. Notes For Codex
+## 10. Notes For Codex
 
 - Make reasonable defaults if information is missing.
 - Ask only when blocked by permissions, credentials, or organization-specific naming.
