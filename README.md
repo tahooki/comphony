@@ -46,9 +46,10 @@ Comphony는 `Symphony`로 회사 구조를 구축하고, 그 운영 방식을 `L
 `comphony`를 클론한 뒤 Codex로 실제 셋업까지 진행하려면 아래 순서로 시작하면 된다.
 
 1. [AGENTS.md](AGENTS.md)를 읽는다.
-2. [MISSION.template.md](MISSION.template.md)를 바탕으로 `MISSION.md`를 만든다.
-3. [Local Layout](docs/LOCAL_LAYOUT.md) 기준으로 `repos`, `workspaces`, `workflows` 구조를 이해한다.
-4. [Start With Codex](docs/START_WITH_CODEX.md)를 읽고 Codex에게 셋업을 맡긴다.
+2. [Local Layout](docs/LOCAL_LAYOUT.md) 기준으로 `repos`, `workspaces`, `workflows` 구조를 이해한다.
+3. [Start With Codex](docs/START_WITH_CODEX.md)를 읽고 Codex에게 셋업을 맡긴다.
+
+사람이 `MISSION.md`를 먼저 만들 필요는 없다. 없으면 Codex가 [MISSION.template.md](MISSION.template.md)를 바탕으로 직접 생성한다.
 
 ## 핵심 문서
 

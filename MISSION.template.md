@@ -2,7 +2,15 @@
 
 이 파일은 Codex에게 "이번에 무엇을 끝까지 세팅해야 하는지" 알려주는 목표 문서 템플릿이다.
 
-실사용 시 이 파일을 `MISSION.md`로 복사해서 값을 채우면 된다.
+실사용 시 사람은 이 파일을 직접 채울 필요가 없다.
+
+기본 원칙:
+
+- `MISSION.md`가 없으면 Codex가 이 템플릿을 기준으로 직접 생성한다.
+- 사용자는 그냥 `셋팅해줘`라고 요청해도 된다.
+- Codex는 기본값을 채운 뒤, 정말 필요한 정보만 추가로 확인한다.
+
+즉 이 파일은 주로 `Codex가 MISSION.md를 생성할 때 참고하는 기준 문서`다.
 
 ## 1. Mission
 
@@ -117,6 +125,7 @@ Codex should not stop until these are complete.
 
 ## 10. Notes For Codex
 
+- If `MISSION.md` does not exist, create it first from this template.
 - Make reasonable defaults if information is missing.
 - Ask only when blocked by permissions, credentials, or organization-specific naming.
 - Prefer a small working setup first, then expand.

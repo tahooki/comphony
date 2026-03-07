@@ -41,15 +41,23 @@ comphony/
 ### 사람
 
 1. 이 저장소를 클론한다.
-2. [MISSION.template.md](../MISSION.template.md)를 참고해 `MISSION.md`를 만든다.
-3. `repos`, `workspaces`, `workflows` 구조를 확인한다.
-4. Codex에게 아래처럼 요청한다.
+2. `repos`, `workspaces`, `workflows` 구조를 확인한다.
+3. Codex에게 아래처럼 요청한다.
 
 ```text
-Read AGENTS.md, docs/START_WITH_CODEX.md, and MISSION.md.
+Read AGENTS.md and docs/START_WITH_CODEX.md.
+If MISSION.md does not exist, create it from MISSION.template.md.
 Set up Symphony + Linear end-to-end for this machine.
 Continue until the acceptance criteria in MISSION.md are satisfied.
 Only stop if you are blocked by missing credentials, permissions, or a required naming decision.
+```
+
+더 짧게는 그냥 이렇게 말해도 된다.
+
+```text
+Read this repo and set it up for me.
+Create any missing local setup files yourself, including MISSION.md.
+Keep going until Linear + Symphony is working end-to-end.
 ```
 
 ### Codex
@@ -58,9 +66,10 @@ Codex는 아래 우선순위로 문서를 읽어야 한다.
 
 1. [../AGENTS.md](../AGENTS.md)
 2. [../MISSION.md](../MISSION.md) 또는 [../MISSION.template.md](../MISSION.template.md)
-3. [SYMPHONY_BASICS.md](SYMPHONY_BASICS.md)
-4. [COMPHONY_COMPANY_MODEL.md](COMPHONY_COMPANY_MODEL.md)
-5. 필요한 경우 [SCENARIO_MATRIX.md](SCENARIO_MATRIX.md), [WORKFLOW_PARTS.md](WORKFLOW_PARTS.md), [ISSUE_LIFECYCLE.md](ISSUE_LIFECYCLE.md)
+3. [LOCAL_LAYOUT.md](LOCAL_LAYOUT.md)
+4. [SYMPHONY_BASICS.md](SYMPHONY_BASICS.md)
+5. [COMPHONY_COMPANY_MODEL.md](COMPHONY_COMPANY_MODEL.md)
+6. 필요한 경우 [SCENARIO_MATRIX.md](SCENARIO_MATRIX.md), [WORKFLOW_PARTS.md](WORKFLOW_PARTS.md), [ISSUE_LIFECYCLE.md](ISSUE_LIFECYCLE.md)
 
 ## 2. Codex가 실제로 수행해야 하는 단계
 
@@ -77,7 +86,8 @@ Codex는 먼저 이번 셋업의 범위를 명확히 해야 한다.
 - 어떤 역할 workflow를 활성화할지
 - 어떤 경로에 workspace를 만들지
 
-`MISSION.md`가 없으면, Codex는 [MISSION.template.md](../MISSION.template.md)를 기준으로 초안을 만들고 부족한 정보만 보완하면 된다.
+`MISSION.md`가 없으면, Codex는 [MISSION.template.md](../MISSION.template.md)를 기준으로 먼저 `MISSION.md`를 생성하고 부족한 정보만 보완하면 된다.
+이때 사용자에게 먼저 문서를 작성하라고 떠넘기면 안 된다.
 
 ### Phase 2. 환경 검증
 
@@ -237,7 +247,23 @@ Codex는 아래가 모두 참일 때까지 계속 도와야 한다.
 - 프로젝트 구조 문서
 - smoke test 결과 또는 확인 로그
 
-## 7. 같이 읽으면 좋은 문서
+## 7. `MISSION.md`를 누가 만드는가
+
+답은 Codex다.
+
+이 저장소의 의도는 사용자가 `MISSION.md`를 손으로 먼저 쓰는 것이 아니다.
+
+기본 흐름은 아래다.
+
+1. 사용자는 그냥 `셋팅해줘`라고 말한다.
+2. Codex는 `AGENTS.md`, `START_WITH_CODEX.md`, `MISSION.template.md`를 읽는다.
+3. `MISSION.md`가 없으면 Codex가 직접 생성한다.
+4. 생성한 `MISSION.md`를 기준으로 실제 셋업을 계속 진행한다.
+5. 세팅이 구체화되면 `MISSION.md`도 실제 값으로 갱신한다.
+
+즉 `MISSION.template.md`는 사람용 사전 작성 양식이라기보다 Codex가 `MISSION.md`를 만드는 기준 문서다.
+
+## 8. 같이 읽으면 좋은 문서
 
 - [SYMPHONY_BASICS.md](SYMPHONY_BASICS.md)
 - [COMPHONY_COMPANY_MODEL.md](COMPHONY_COMPANY_MODEL.md)
