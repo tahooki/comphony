@@ -67,12 +67,13 @@ Symphony는 보통 다음 세 가지를 조합해서 운영한다.
 1. [START_WITH_CODEX.md](START_WITH_CODEX.md)
 2. [LOCAL_LAYOUT.md](LOCAL_LAYOUT.md)
 3. [SYMPHONY_BASICS.md](SYMPHONY_BASICS.md)
-4. [COMPHONY_DESK_MODEL.md](COMPHONY_DESK_MODEL.md)
-5. [COMPHONY_COMPANY_MODEL.md](COMPHONY_COMPANY_MODEL.md)
-6. [SCENARIO_MATRIX.md](SCENARIO_MATRIX.md)
-7. [ISSUE_LIFECYCLE.md](ISSUE_LIFECYCLE.md)
-8. [WORKFLOW_PARTS.md](WORKFLOW_PARTS.md)
-9. 필요한 샘플 workflow 파일
+4. [UI_UX_PRO_MAX_GUIDE.md](UI_UX_PRO_MAX_GUIDE.md)
+5. [COMPHONY_DESK_MODEL.md](COMPHONY_DESK_MODEL.md)
+6. [COMPHONY_COMPANY_MODEL.md](COMPHONY_COMPANY_MODEL.md)
+7. [SCENARIO_MATRIX.md](SCENARIO_MATRIX.md)
+8. [ISSUE_LIFECYCLE.md](ISSUE_LIFECYCLE.md)
+9. [WORKFLOW_PARTS.md](WORKFLOW_PARTS.md)
+10. 필요한 샘플 workflow 파일
 
 ## 주의할 점
 
@@ -87,6 +88,7 @@ Symphony는 보통 다음 세 가지를 조합해서 운영한다.
 - "그냥 repo 하나 자동 코딩" -> `WORKFLOW.dev.single-repo.md`
 - "사람과 소통하는 단일 창구가 필요" -> `COMPHONY_DESK_MODEL.md`, `WORKFLOW.desk.md`
 - "PM/Research/Design/Dev 역할 분리" -> `WORKFLOW.pm.md`, `WORKFLOW.research.md`, `WORKFLOW.design.md`, `WORKFLOW.dev.relay.md`
+- "디자이너가 레퍼런스 조사와 디자인 시스템 초안을 만들게 하고 싶다" -> `UI_UX_PRO_MAX_GUIDE.md`, `WORKFLOW.design.md`
 - "npm install이 너무 무겁다" -> `WORKFLOW.dev.worktree.md`
 - "리서치 티켓 처리" -> `WORKFLOW.research.md`
 - "새 repo와 Linear 프로젝트까지 자동 생성" -> `WORKFLOW.project-admin.md`

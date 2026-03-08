@@ -14,6 +14,7 @@ MISSION.md
 *.log
 *.pid
 tmp/
+__pycache__/
 
 # Local source repos cloned or created by each user
 repos/*

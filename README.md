@@ -115,6 +115,7 @@ Comphony standardizes the local machine layout like this:
 
 ```text
 comphony/
+  .codex/
   AGENTS.md
   MISSION.md
   MISSION.template.md
@@ -128,6 +129,8 @@ What each folder means:
 
 - `docs/`
   - operating docs and workflow templates
+- `.codex/skills/`
+  - project-local Codex skills such as `ui-ux-pro-max`
 - `repos/`
   - canonical source repos
 - `workspaces/`
@@ -179,6 +182,7 @@ The local environment template is tracked as [.env.example](.env.example), while
 - [Start With Codex](docs/START_WITH_CODEX.md)
 - [Local Layout](docs/LOCAL_LAYOUT.md)
 - [Symphony Basics](docs/SYMPHONY_BASICS.md)
+- [UI UX Pro Max Guide](docs/UI_UX_PRO_MAX_GUIDE.md)
 - [Comphony Desk Model](docs/COMPHONY_DESK_MODEL.md)
 - [Comphony Company Model](docs/COMPHONY_COMPANY_MODEL.md)
 - [Scenario Matrix](docs/SCENARIO_MATRIX.md)
