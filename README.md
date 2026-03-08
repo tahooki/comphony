@@ -183,6 +183,7 @@ The local environment template is tracked as [.env.example](.env.example), while
 - [Local Layout](docs/LOCAL_LAYOUT.md)
 - [Symphony Basics](docs/SYMPHONY_BASICS.md)
 - [UI UX Pro Max Guide](docs/UI_UX_PRO_MAX_GUIDE.md)
+- [Operating-Level Development Plan](docs/OPERATING_LEVEL_DEVELOPMENT_PLAN.md)
 - [Comphony Desk Model](docs/COMPHONY_DESK_MODEL.md)
 - [Comphony Company Model](docs/COMPHONY_COMPANY_MODEL.md)
 - [Scenario Matrix](docs/SCENARIO_MATRIX.md)
