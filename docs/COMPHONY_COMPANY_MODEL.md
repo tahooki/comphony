@@ -25,16 +25,33 @@ Comphony를 회사처럼 보면 각 요소의 역할은 다음과 같다.
 
 ```mermaid
 flowchart TD
-    A["Idea Lab"] --> B["Project Managing"]
-    B --> C["Product - Alpha"]
-    B --> D["Product - Beta"]
+    U["User"] --> D["Comphony Desk"]
+    D --> I["Idea Lab"]
+    D --> P["Project Managing"]
+    D --> C["Product - Alpha"]
+    D --> O["Ops / Maintenance"]
+    P --> C
     C --> E["Research / Design / Dev Relay"]
-    D --> F["Research / Design / Dev Relay"]
 ```
 
 이 구조에서 각 프로젝트의 의미는 다음과 같다.
 
-### 1. Idea Lab
+### 1. Comphony Desk
+
+사람이 요청을 넣는 단일 창구이자, 하위 프로젝트로 일을 분류하고 결과를 다시 모아 보고하는 front office다.
+
+- 역할
+  - 사람 요청 intake
+  - triage / routing
+  - child issue 생성
+  - 진행 상황 회수 및 최종 보고
+- 주된 workflow
+  - `desk workflow`
+- repo 필요성
+  - 보통 없음
+  - notes/handoff 폴더만으로 충분한 경우가 많음
+
+### 2. Idea Lab
 
 새 아이디어, 리서치 요청, 문제 발견, 개선 아이디어를 다룬다.
 
@@ -50,7 +67,7 @@ flowchart TD
   - 보통 없음
   - 필요하면 문서 repo 또는 knowledge repo만 연결
 
-### 2. Project Managing
+### 3. Project Managing
 
 채택된 아이디어를 실제 프로젝트로 전환하는 메타 운영 부서다.
 
@@ -64,7 +81,7 @@ flowchart TD
 - repo 필요성
   - 보통 `project-admin` 같은 관리용 repo 사용
 
-### 3. Product - <이름>
+### 4. Product - <이름>
 
 실제 제품 개발이 일어나는 실행 부서다.
 
@@ -80,7 +97,7 @@ flowchart TD
 - repo 필요성
   - 제품 repo 필요
 
-### 4. Ops / Maintenance
+### 5. Ops / Maintenance
 
 운영 작업이 많아질 때만 분리한다.
 
@@ -98,6 +115,7 @@ flowchart TD
 
 | Linear 프로젝트 | 목적 | 대표 workflow | repo |
 | --- | --- | --- | --- |
+| `Comphony Desk` | intake, triage, reporting | `WORKFLOW.desk.md` | 보통 없음 |
 | `Idea Lab` | 아이디어, 기획, 탐색 | `WORKFLOW.pm.md`, `WORKFLOW.research.md` | 선택 |
 | `Project Managing` | 새 프로젝트 provisioning | `WORKFLOW.project-admin.md` | 관리용 repo |
 | `Product - Foo` | 실제 제품 실행 | `WORKFLOW.design.md`, `WORKFLOW.dev.relay.md` | 제품 repo |
@@ -137,6 +155,15 @@ flowchart TD
 - `Approved`
 - `Rejected`
 
+### Comphony Desk
+
+- `Inbox`
+- `Clarifying`
+- `Triaged`
+- `Waiting`
+- `Reported`
+- `Done`
+
 ### Project Managing
 
 - `Requested`
@@ -160,35 +187,38 @@ flowchart TD
 
 ## 5. 이 회사 구조에서 이슈는 어떻게 흐르는가
 
-### 흐름 A: 아이디어에서 제품 프로젝트까지
+### 흐름 A: 사람 요청에서 제품 프로젝트까지
 
-1. `Idea Lab`에 아이디어 이슈를 만든다.
-2. PM 또는 Research workflow가 아이디어를 정리한다.
-3. 가치가 있다고 판단되면 상태를 `Approved`로 바꾼다.
-4. `Project Managing`에 새 이슈를 만든다.
-5. project-admin workflow가 새 repo, 새 Linear 프로젝트, 새 workflow를 준비한다.
-6. 결과로 `Product - Foo` 프로젝트가 생긴다.
-7. 실제 개발 이슈는 `Product - Foo`에서 처리한다.
+1. 사람이 `Comphony Desk`에 요청 이슈를 만든다.
+2. Desk workflow가 요청을 분류한다.
+3. 아이디어 정리가 필요하면 `Idea Lab`에 child issue를 만든다.
+4. 새 제품 provisioning이 필요하면 `Project Managing`에 child issue를 만든다.
+5. 실행 준비가 되면 결과로 `Product - Foo` 프로젝트가 생긴다.
+6. 실제 개발 이슈는 `Product - Foo`에서 처리한다.
+7. 하위 프로젝트 결과는 다시 Desk 부모 이슈로 보고된다.
 
 ### 흐름 B: 기존 제품 기능 개발
 
-1. `Product - Foo`에 기능 이슈를 만든다.
-2. 상태가 `Planning`이면 PM 성격 workflow가 요구사항을 다듬는다.
-3. 상태가 `Research`이면 리서치 workflow가 비교/조사를 수행한다.
-4. 상태가 `Design`이면 디자인 workflow가 화면 구조와 카피를 정리한다.
-5. 상태가 `Todo` 또는 `In Progress`가 되면 dev workflow가 workspace에서 실제 코드를 수정한다.
-6. 검증 후 `Human Review` 또는 `Done`으로 넘긴다.
+1. 사람이 `Comphony Desk`에 기능 요청을 만든다.
+2. Desk가 구현 가능성을 보고 `Product - Foo` 또는 `Idea Lab`로 보낸다.
+3. `Product - Foo`에서 상태가 `Planning`이면 PM 성격 workflow가 요구사항을 다듬는다.
+4. 상태가 `Research`이면 리서치 workflow가 비교/조사를 수행한다.
+5. 상태가 `Design`이면 디자인 workflow가 화면 구조와 카피를 정리한다.
+6. 상태가 `Todo` 또는 `In Progress`가 되면 dev workflow가 workspace에서 실제 코드를 수정한다.
+7. 검증 후 `Human Review` 또는 `Done`으로 넘긴다.
+8. 결과 요약은 다시 Desk 부모 이슈로 올라간다.
 
 ### 흐름 C: 새 프로젝트 생성
 
-1. `Project Managing`에 `Bootstrap new project Foo` 이슈를 만든다.
-2. 이슈 본문에 repo 이름, 제품 이름, 사용할 스택, 원하는 상태 구조를 적는다.
-3. project-admin workflow가:
+1. 사람이 `Comphony Desk`에 PRD 또는 프로젝트 생성 요청을 넣는다.
+2. Desk가 `Project Managing`에 `Bootstrap new project Foo` child issue를 만든다.
+3. child issue 본문에 repo 이름, 제품 이름, 사용할 스택, 원하는 상태 구조를 적는다.
+4. project-admin workflow가:
    - repo 생성
    - Linear 프로젝트 생성
    - workflow 파일 생성
    - 기본 문서 생성
-4. 완료 후 결과 경로와 운영 방법을 기록한다.
+5. 완료 후 결과 경로와 운영 방법을 Desk 부모 이슈에 기록한다.
 
 ## 6. 역할 분리는 어디서 일어나는가
 
@@ -198,6 +228,7 @@ flowchart TD
 
 어느 부서가 이슈를 받을지 정한다.
 
+- `Comphony Desk`
 - `Idea Lab`
 - `Project Managing`
 - `Product - Foo`
@@ -229,6 +260,7 @@ flowchart TD
 
 프로젝트 수를 최소화하고 싶은 경우:
 
+- `Comphony Desk`
 - `Idea Lab`
 - `Project Managing`
 - `Product - Foo`
@@ -240,6 +272,7 @@ flowchart TD
 제품이 늘어나면 제품별 실행 프로젝트를 나눈다.
 
 - `Idea Lab`
+- `Comphony Desk`
 - `Project Managing`
 - `Product - Foo`
 - `Product - Bar`
@@ -252,6 +285,7 @@ flowchart TD
 리서치 성격이 강하면 `Research Hub`를 추가할 수 있다.
 
 - `Idea Lab`
+- `Comphony Desk`
 - `Research Hub`
 - `Project Managing`
 - `Product - Foo`

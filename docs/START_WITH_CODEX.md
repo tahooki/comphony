@@ -69,7 +69,8 @@ Codex는 아래 우선순위로 문서를 읽어야 한다.
 3. [LOCAL_LAYOUT.md](LOCAL_LAYOUT.md)
 4. [SYMPHONY_BASICS.md](SYMPHONY_BASICS.md)
 5. [COMPHONY_COMPANY_MODEL.md](COMPHONY_COMPANY_MODEL.md)
-6. 필요한 경우 [SCENARIO_MATRIX.md](SCENARIO_MATRIX.md), [WORKFLOW_PARTS.md](WORKFLOW_PARTS.md), [ISSUE_LIFECYCLE.md](ISSUE_LIFECYCLE.md)
+6. [COMPHONY_DESK_MODEL.md](COMPHONY_DESK_MODEL.md)
+7. 필요한 경우 [SCENARIO_MATRIX.md](SCENARIO_MATRIX.md), [WORKFLOW_PARTS.md](WORKFLOW_PARTS.md), [ISSUE_LIFECYCLE.md](ISSUE_LIFECYCLE.md)
 
 ## 2. Codex가 실제로 수행해야 하는 단계
 
@@ -112,6 +113,7 @@ Codex는 아래를 맞춘다.
 
 추천 기본 구조:
 
+- `Comphony Desk`
 - `Idea Lab`
 - `Project Managing`
 - `Product - Core`
@@ -130,6 +132,7 @@ Codex는 역할과 repo 전략에 맞는 workflow 파일을 만든다.
 
 예:
 
+- `WORKFLOW.desk.md`
 - `WORKFLOW.pm.md`
 - `WORKFLOW.research.md`
 - `WORKFLOW.dev.md`
@@ -212,12 +215,14 @@ Codex는 최소 한 번은 실제 작동 경로를 검증해야 한다.
 
 ### Linear 프로젝트
 
+- `Comphony Desk`
 - `Idea Lab`
 - `Project Managing`
 - `Product - Core`
 
 ### Workflow
 
+- `Desk workflow`
 - `PM workflow`
 - `Research workflow`
 - `Dev workflow`
@@ -225,6 +230,8 @@ Codex는 최소 한 번은 실제 작동 경로를 검증해야 한다.
 
 ### 역할 분리 방식
 
+- `Comphony Desk`
+  - `Inbox`, `Clarifying`, `Triaged`, `Waiting`, `Reported`
 - `Idea Lab`
   - `Planning`, `Research`, `Approved`
 - `Project Managing`

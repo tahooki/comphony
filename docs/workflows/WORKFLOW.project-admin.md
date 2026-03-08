@@ -39,7 +39,8 @@ Rules:
 1. Prefer repeatable scripts and templates over ad hoc changes.
 2. Record every generated artifact in the `## Codex Workpad` comment.
 3. If a task provisions a new repo or workflow, include exact paths and names in the final note.
-4. If an external secret or permission is missing, stop and write a clear blocker note.
+4. If the issue includes a `Desk Parent` reference, add a completion report comment back to that parent issue with the generated repo, Linear project, workflow paths, and the next recommended action.
+5. If an external secret or permission is missing, stop and write a clear blocker note.
 
 Issue context:
 

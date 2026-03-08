@@ -6,6 +6,7 @@
 
 | 상황 | 추천 구조 | Linear 구성 | repo 준비 방식 | 추천 샘플 |
 | --- | --- | --- | --- | --- |
+| 사람은 한 프로젝트에만 요청하고 나머지는 자동 분류 | Desk + downstream lanes | `Comphony Desk` + child projects | Desk는 무복제, child workflow가 각자 repo 전략 사용 | `COMPHONY_DESK_MODEL.md`, `WORKFLOW.desk.md` |
 | repo 하나를 계속 개발 | repo별 dev workflow 1개 | 프로젝트 1개 | clone 또는 worktree | `WORKFLOW.dev.single-repo.md` |
 | 같은 프로젝트 안에서 PM/Research/Design/Dev 분리 | 역할별 workflow 4개 | 프로젝트 1개, 상태 분리 | PM/Research는 무복제 가능, Dev만 repo 준비 | `WORKFLOW.pm.md`, `WORKFLOW.research.md`, `WORKFLOW.design.md`, `WORKFLOW.dev.relay.md` |
 | 설치가 무거운 Node repo | worktree 기반 dev workflow | 프로젝트 1개 | `git worktree` + shared cache | `WORKFLOW.dev.worktree.md` |
@@ -15,7 +16,27 @@
 
 ## 케이스별 추천
 
-## A. 가장 기본적인 코드 작업
+## A. 사람과 하나의 창구로만 소통하고 싶다
+
+이런 경우:
+
+- 사용자가 어느 프로젝트에 이슈를 넣어야 할지 고민하기 싫다
+- AI가 요청을 보고 알아서 `Idea Lab`, `Project Managing`, `Product`로 보내길 원한다
+- 작업 결과도 다시 하나의 부모 이슈로 보고받고 싶다
+
+추천:
+
+- `Comphony Desk` 프로젝트 1개
+- `Idea Lab`, `Project Managing`, `Product - Foo` 같은 downstream project
+- Desk workflow 1개
+- child workflow는 각 프로젝트 역할대로 유지
+
+사용 샘플:
+
+- [COMPHONY_DESK_MODEL.md](COMPHONY_DESK_MODEL.md)
+- [WORKFLOW.desk.md](workflows/WORKFLOW.desk.md)
+
+## B. 가장 기본적인 코드 작업
 
 이런 경우:
 
@@ -33,7 +54,7 @@
 
 - [WORKFLOW.dev.single-repo.md](workflows/WORKFLOW.dev.single-repo.md)
 
-## B. 역할을 나누고 싶다
+## C. 역할을 나누고 싶다
 
 이런 경우:
 
@@ -61,7 +82,7 @@
 - [WORKFLOW.design.md](workflows/WORKFLOW.design.md)
 - [WORKFLOW.dev.relay.md](workflows/WORKFLOW.dev.relay.md)
 
-## C. 설치 비용이 너무 크다
+## D. 설치 비용이 너무 크다
 
 이런 경우:
 
@@ -79,7 +100,7 @@
 
 - [WORKFLOW.dev.worktree.md](workflows/WORKFLOW.dev.worktree.md)
 
-## D. 리서치 작업만 처리하고 싶다
+## E. 리서치 작업만 처리하고 싶다
 
 이런 경우:
 
@@ -97,7 +118,7 @@
 
 - [WORKFLOW.research.md](workflows/WORKFLOW.research.md)
 
-## E. 운영 자동화/프로젝트 생성 자동화
+## F. 운영 자동화/프로젝트 생성 자동화
 
 이런 경우:
 
@@ -140,6 +161,7 @@
 
 처음에는 보통 이것만으로 충분하다.
 
+- `Comphony Desk`
 - repo 1개
 - Linear 프로젝트 1개
 - dev workflow 1개

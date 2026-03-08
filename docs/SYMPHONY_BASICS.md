@@ -2,13 +2,14 @@
 
 이 문서는 Symphony를 처음 접할 때 가장 먼저 알아야 할 내용을 한 번에 설명한다.
 
-다루는 내용은 아래 다섯 가지다.
+다루는 내용은 아래 여섯 가지다.
 
 1. Symphony가 무엇인지
 2. Symphony와 Linear를 어떻게 연결하는지
 3. Workflow 파일이 무엇인지
 4. 이슈 티켓이 어떻게 처리되는지
 5. 전체 작동 흐름이 어떻게 이어지는지
+6. 사람과 소통하는 `Desk` 레이어를 둘 때 무엇이 달라지는지
 
 ## 1. Symphony는 무엇인가
 
@@ -184,6 +185,19 @@ flowchart LR
 5. `after_create`가 실행되어 repo clone, install, notes 폴더 생성 같은 준비 작업을 한다.
 6. Codex가 workflow prompt와 이슈 본문을 받아 실제 작업을 한다.
 7. 결과를 workspace 파일과 Linear 코멘트/상태에 반영한다.
+
+### Desk 레이어를 두는 경우
+
+여러 실행 프로젝트 중 어디에 이슈를 넣어야 할지 사람이 직접 고르기 싫다면 `Comphony Desk` 같은 intake 프로젝트를 하나 더 둘 수 있다.
+
+이 경우:
+
+- 사람은 `Desk`에만 요청한다
+- Desk workflow는 요청을 분류한다
+- 실제 작업은 `Idea Lab`, `Project Managing`, `Product - Foo` 같은 downstream project가 수행한다
+- 완료 결과는 다시 Desk 부모 이슈로 회수된다
+
+즉 Desk는 실행 workflow라기보다 `routing + reporting workflow`다.
 
 ## 7. 실제 코드는 어디에서 수정되는가
 

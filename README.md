@@ -11,6 +11,10 @@ Comphony is not just a docs repo. It is a model for an AI-native company structu
 
 The default company looks like this:
 
+- `Comphony Desk`
+  - single human-facing intake lane
+  - classifies requests and delegates work
+  - collects final reports from downstream projects
 - `Idea Lab`
   - collect ideas
   - refine requests
@@ -63,19 +67,23 @@ The recommended operating model is simple and scalable:
 
 ```mermaid
 flowchart TD
-    A["Idea Lab"] --> B["Project Managing"]
-    B --> C["Product - Alpha"]
-    B --> D["Product - Beta"]
+    U["User"] --> D["Comphony Desk"]
+    D --> I["Idea Lab"]
+    D --> P["Project Managing"]
+    D --> C["Product - Alpha"]
+    D --> O["Ops / Maintenance"]
+    P --> C
     C --> E["Research / Design / Dev relay"]
-    D --> F["Research / Design / Dev relay"]
 ```
 
 That means:
 
+- people talk to `Comphony Desk`
 - ideas start in `Idea Lab`
-- approved work moves into `Project Managing`
+- setup and provisioning move into `Project Managing`
 - new products get their own Linear projects, repos, and workflows
 - day-to-day execution happens in product-specific lanes
+- final reporting can be pulled back into the Desk parent issue
 
 This gives you a structure that feels closer to an actual company than a single automation script.
 
@@ -171,6 +179,7 @@ The local environment template is tracked as [.env.example](.env.example), while
 - [Start With Codex](docs/START_WITH_CODEX.md)
 - [Local Layout](docs/LOCAL_LAYOUT.md)
 - [Symphony Basics](docs/SYMPHONY_BASICS.md)
+- [Comphony Desk Model](docs/COMPHONY_DESK_MODEL.md)
 - [Comphony Company Model](docs/COMPHONY_COMPANY_MODEL.md)
 - [Scenario Matrix](docs/SCENARIO_MATRIX.md)
 - [Issue Lifecycle](docs/ISSUE_LIFECYCLE.md)

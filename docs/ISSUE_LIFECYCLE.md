@@ -6,6 +6,7 @@
 - Workflow 파일은 정확히 어떤 역할을 하는가
 - 대상 repo가 있는 코드 작업과, repo가 없는 research 작업은 무엇이 다른가
 - project-admin 같은 메타 작업은 어떤 식으로 돌아가는가
+- 사람과 한 창구로 소통하는 `Desk` 프로젝트를 둘 때 흐름은 어떻게 달라지는가
 
 이 문서는 "이슈 생성 시점부터 처리 완료까지"의 흐름을 설명한다.
 
@@ -82,6 +83,28 @@ flowchart LR
 - Workflow는 어디서 어떤 방식으로 처리할지 정한다
 - 실제 작업은 workspace에서 일어난다
 - 결과는 다시 Linear에 반영된다
+
+## 2.5. Desk를 앞단에 두는 경우
+
+사람이 여러 프로젝트 중 어디에 이슈를 넣어야 할지 고민하지 않게 하려면 `Comphony Desk`를 맨 앞에 두는 것이 좋다.
+
+이 경우 전체 흐름은 아래처럼 바뀐다.
+
+```mermaid
+flowchart LR
+    A["User creates Desk issue"] --> B["Desk workflow triages request"]
+    B --> C["Child issue created in Idea Lab / Project Managing / Product"]
+    C --> D["Downstream workflow executes in its own workspace"]
+    D --> E["Result comment or state update sent back to Desk parent"]
+    E --> F["Desk summarizes for the human requester"]
+```
+
+핵심 차이:
+
+- 사람은 `Desk` 프로젝트에만 이슈를 만든다.
+- Desk workflow는 실제 실행을 하지 않고 `routing`을 한다.
+- 실제 작업은 하위 프로젝트 이슈가 담당한다.
+- 완료 보고는 부모 Desk 이슈로 다시 회수된다.
 
 ## 3. 코드 작업 이슈는 어떻게 처리되는가
 
@@ -229,6 +252,23 @@ research 이슈는 다음 셋 중 하나로 처리할 수 있다.
 
 즉 이 경우도 구조는 같다. 다만 "작업 대상"이 제품 코드가 아니라 운영/프로비저닝 작업일 뿐이다.
 
+### Desk와 함께 쓰는 경우
+
+`Project Managing`가 `Desk`의 child issue로 생성되는 경우를 권장한다.
+
+이때 child issue에는 아래가 들어가야 한다.
+
+- `Desk Parent` 식별자 또는 URL
+- 완료 시 부모 Desk 이슈에 무엇을 보고할지
+- 생성해야 하는 repo / 프로젝트 / workflow 이름
+
+작업 완료 후에는 다음이 부모 Desk 이슈로 돌아와야 한다.
+
+- 생성된 repo 경로
+- 생성된 Linear 프로젝트 이름과 slug
+- 생성된 workflow 파일 경로
+- 다음 추천 작업
+
 ## 7. 이슈 생성 시점에서 실제로 무엇을 적어야 하나
 
 ### 코드 작업 이슈
@@ -255,6 +295,33 @@ Scope:
 Validation:
 - dashboard loads at /
 - focused dashboard tests pass
+```
+
+### Desk intake 이슈
+
+사람이 직접 여러 실행 프로젝트를 고르는 대신 Desk에 넣고 싶다면, 이슈에는 아래가 들어가면 충분하다.
+
+- 무엇을 원하는지
+- 이미 있는 기획문서나 PRD
+- 원하는 최종 상태
+- 누가 후속으로 처리해야 할지 아직 확실하지 않다는 점
+
+예:
+
+```md
+Title: Turn this PRD into a real project
+
+Goal:
+Set up a new product from the attached planning document.
+
+Source:
+- /absolute/path/to/prd.md
+
+Desired outcome:
+- repo exists
+- Linear product project exists
+- workflows exist
+- next PM or dev issue is ready
 ```
 
 ### research 이슈

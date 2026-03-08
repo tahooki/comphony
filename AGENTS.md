@@ -63,7 +63,8 @@
 2. [docs/LOCAL_LAYOUT.md](docs/LOCAL_LAYOUT.md)
 3. [MISSION.template.md](MISSION.template.md)
 4. [docs/SYMPHONY_BASICS.md](docs/SYMPHONY_BASICS.md)
-5. [docs/COMPHONY_COMPANY_MODEL.md](docs/COMPHONY_COMPANY_MODEL.md)
+5. [docs/COMPHONY_DESK_MODEL.md](docs/COMPHONY_DESK_MODEL.md)
+6. [docs/COMPHONY_COMPANY_MODEL.md](docs/COMPHONY_COMPANY_MODEL.md)
 
 ## `MISSION.md` 생성 규칙
 
@@ -77,3 +78,14 @@ Codex는 아래처럼 행동해야 한다.
 4. 세팅이 진행되면서 실제 경로, 프로젝트 이름, workflow 이름으로 계속 갱신한다.
 
 즉 사용자는 그냥 "셋팅해줘"라고 말할 수 있어야 하고, 목표 문서 작성 자체도 Codex의 책임이다.
+
+## 기본 추천 회사 구조
+
+사용자가 별도 구조를 지정하지 않으면 아래를 기본 권장값으로 본다.
+
+- `Comphony Desk`
+- `Idea Lab`
+- `Project Managing`
+- `Product - Core`
+
+즉 사람은 `Comphony Desk`를 단일 창구로 사용하고, 실제 실행은 downstream project로 분배하는 구조를 우선 추천한다.

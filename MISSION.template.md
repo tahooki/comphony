@@ -22,7 +22,7 @@
 
 - Company or workspace name: `Comphony`
 - Primary objective: `Symphony와 Linear를 연결해서 이슈만 만들면 작업이 시작되는 구조 만들기`
-- Desired end state: `Idea Lab, Project Managing, Product - Core 프로젝트와 dev/research/project-admin workflow가 작동`
+- Desired end state: `Comphony Desk, Idea Lab, Project Managing, Product - Core 프로젝트와 desk/dev/research/project-admin workflow가 작동`
 
 ## 2. Local Layout
 
@@ -43,6 +43,7 @@
 - Linear workspace/team:
 - Use existing workspace or create new projects:
 - Projects to prepare:
+  - `Comphony Desk`
   - `Idea Lab`
   - `Project Managing`
   - `Product - Core`
@@ -50,6 +51,9 @@
 
 예:
 
+예:
+
+- Comphony Desk: `Inbox`, `Clarifying`, `Triaged`, `Waiting`, `Reported`, `Done`
 - Idea Lab: `Inbox`, `Planning`, `Research`, `Approved`, `Rejected`
 - Project Managing: `Requested`, `Provisioning`, `Verification`, `Done`
 - Product - Core: `Planning`, `Research`, `Design`, `Todo`, `In Progress`, `Rework`, `Human Review`, `Merging`, `Done`
@@ -73,6 +77,7 @@
 
 - Do you want single-repo dev only, or role relay?:
 - Roles to enable:
+  - `Desk`
   - `PM`
   - `Research`
   - `Design`
@@ -112,6 +117,7 @@ Codex should not stop until these are complete.
 - [ ] Linear API connection works
 - [ ] Linear projects and states are prepared
 - [ ] Workflow files are created for the chosen setup
+- [ ] A Desk intake flow is defined or explicitly skipped
 - [ ] Run scripts or commands are documented
 - [ ] At least one smoke-test issue path is verified
 - [ ] Final docs reflect the actual local paths and project names
