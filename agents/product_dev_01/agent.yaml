@@ -1,0 +1,26 @@
+id: product_dev_01
+name: Product Core Developer
+role: build
+version: 0.1.0
+publisher: comphony
+description: Local product implementation agent for Product - Core.
+capabilities:
+  - implementation
+  - repo_changes
+  - review_response
+tools:
+  - codex
+permissions:
+  read_repo: allow
+  write_repo: guarded
+  run_commands: guarded
+supported_lanes:
+  - build
+  - review
+required_runtime:
+  comphony_min_version: 0.1.0
+output_contracts:
+  - implementation_note
+  - review_response
+entrypoints:
+  prompt: prompts/system.md

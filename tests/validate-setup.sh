@@ -83,8 +83,22 @@ check_path "repo root" "${COMPHONY_REPO_ROOT}"
 check_path "workspace root" "${COMPHONY_WORKSPACE_ROOT}"
 check_path "workflow root" "${COMPHONY_WORKFLOW_ROOT}"
 check_path "mission file" "${ROOT_DIR}/MISSION.md"
+check_path "company config" "${ROOT_DIR}/company.yaml"
+check_path "package manifest" "${ROOT_DIR}/package.json"
 
 check_nonempty_var "LINEAR_API_KEY"
+
+if [[ -d "${ROOT_DIR}/node_modules" ]]; then
+  ok "node_modules present"
+else
+  warn "node_modules missing; run npm install"
+fi
+
+if npm run --silent validate:config >/dev/null 2>&1; then
+  ok "npm run validate:config"
+else
+  fail "npm run validate:config"
+fi
 
 if [[ -n "${SYMPHONY_BIN:-}" ]]; then
   if [[ -x "${SYMPHONY_BIN}" ]]; then

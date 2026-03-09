@@ -1,0 +1,26 @@
+id: desk_coordinator
+name: Comphony Desk Coordinator
+role: coordination
+version: 0.1.0
+publisher: comphony
+description: Intake, routing, and reporting coordinator for Comphony.
+capabilities:
+  - intake
+  - routing
+  - reporting
+tools:
+  - codex
+permissions:
+  read_memory: allow
+  write_memory: allow
+  request_review: allow
+supported_lanes:
+  - planning
+  - review
+required_runtime:
+  comphony_min_version: 0.1.0
+output_contracts:
+  - intake_summary
+  - handoff_report
+entrypoints:
+  prompt: prompts/system.md

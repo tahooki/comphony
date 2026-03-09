@@ -24,9 +24,25 @@ This creates:
 
 - `.env` from `.env.example` if missing
 - `MISSION.md` from `MISSION.template.md` if missing
+- `agents/` and `runtime-data/` if missing
 - local `repos/`, `workspaces/`, and `workflows/` directories
 
-## 3. Fill local environment values
+## 3. Validate the tracked runtime config
+
+Run:
+
+```bash
+npm install
+npm run validate:config
+```
+
+If you want the local HTTP runtime:
+
+```bash
+npm run server:start
+```
+
+## 4. Fill local environment values
 
 Edit `.env` and set at least:
 
@@ -37,7 +53,7 @@ Edit `.env` and set at least:
 - `COMPHONY_WORKSPACE_ROOT`
 - `COMPHONY_WORKFLOW_ROOT`
 
-## 4. Ask Codex to do the setup
+## 5. Ask Codex to do the setup
 
 Example prompt:
 
@@ -47,7 +63,7 @@ Create any missing local setup files yourself, including MISSION.md.
 Keep going until the current Comphony runtime foundation is working end-to-end.
 ```
 
-## 5. Validate the result
+## 6. Validate the result
 
 Run:
 
@@ -66,7 +82,7 @@ If you also want network checks:
 - Symphony dashboard reachability check
 - Linear API key validation through GraphQL
 
-## 6. Reset and test again
+## 7. Reset and test again
 
 To clear local generated state and repeat the setup flow:
 

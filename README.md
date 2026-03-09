@@ -106,10 +106,12 @@ comphony/
   .codex/
   AGENTS.md
   agents/
+  company.yaml
   MISSION.md
   MISSION.template.md
   docs/
   repos/
+  runtime-data/
   workspaces/
   workflows/
 ```
@@ -124,6 +126,8 @@ What each folder means:
   - first-party installable agent packages
 - `repos/`
   - canonical source repos
+- `runtime-data/`
+  - local runtime state and imported package cache
 - `workspaces/`
   - issue-specific working directories
 - `workflows/`
@@ -137,6 +141,7 @@ The following are intentionally ignored:
 
 - `MISSION.md`
 - `repos/*`
+- `runtime-data/*`
 - `workspaces/*`
 - `workflows/*`
 
@@ -160,6 +165,36 @@ Comphony now includes a simple local setup test flow:
   - clears local generated state so you can test the setup flow again
 
 The local environment template is tracked as [.env.example](.env.example), while `.env` itself stays ignored.
+
+## Runtime MVP
+
+The repo now includes the first real local runtime slice:
+
+- [company.yaml](/Users/tahooki/Documents/comphony/company.yaml)
+  - tracked company configuration
+- [package.json](/Users/tahooki/Documents/comphony/package.json)
+  - Node/TypeScript package and CLI scripts
+- [tsconfig.json](/Users/tahooki/Documents/comphony/tsconfig.json)
+  - TypeScript compiler configuration
+- [src/cli.ts](/Users/tahooki/Documents/comphony/src/cli.ts)
+  - `init`, `validate`, and `server start`
+- [src/server.ts](/Users/tahooki/Documents/comphony/src/server.ts)
+  - minimal HTTP runtime
+
+Quick start:
+
+```bash
+npm install
+npm run validate:config
+npm run server:start
+```
+
+Available server endpoints:
+
+- `GET /healthz`
+- `GET /v1/status`
+- `GET /v1/projects`
+- `GET /v1/agents`
 
 ## Start Here
 

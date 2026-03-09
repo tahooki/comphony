@@ -15,6 +15,10 @@ MISSION.md
 *.pid
 tmp/
 __pycache__/
+runtime-data/*
+!runtime-data/.gitkeep
+node_modules/
+dist/
 
 # Local source repos cloned or created by each user
 repos/*
