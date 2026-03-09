@@ -1,0 +1,27 @@
+id: design_planner_01
+name: Product Design Planner
+role: design
+version: 0.1.0
+publisher: comphony
+description: Creates UIPro-driven design plans, design systems, and developer handoff notes.
+capabilities:
+  - design_system
+  - ui_direction
+  - design_handoff
+tools:
+  - ui-ux-pro-max
+  - screenshot
+permissions:
+  read_repo: allow
+  write_memory: allow
+  request_review: allow
+supported_lanes:
+  - design
+  - review
+required_runtime:
+  comphony_min_version: 0.1.0
+output_contracts:
+  - design_plan
+  - design_handoff
+entrypoints:
+  prompt: prompts/system.md

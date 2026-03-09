@@ -177,9 +177,11 @@ The repo now includes the first real local runtime slice:
 - [tsconfig.json](/Users/tahooki/Documents/comphony/tsconfig.json)
   - TypeScript compiler configuration
 - [src/cli.ts](/Users/tahooki/Documents/comphony/src/cli.ts)
-  - `init`, `validate`, and `server start`
+  - `init`, `validate`, `project list`, `agent list`, `task create`, `task list`, `task assign`, `task autoassign`, `task status`, `task work`, `thread show`, and `server start`
 - [src/server.ts](/Users/tahooki/Documents/comphony/src/server.ts)
   - minimal HTTP runtime
+- [src/state.ts](/Users/tahooki/Documents/comphony/src/state.ts)
+  - local persistent state for projects, agents, tasks, and threads
 
 Quick start:
 
@@ -189,12 +191,89 @@ npm run validate:config
 npm run server:start
 ```
 
+Then open:
+
+- [http://127.0.0.1:43110/](http://127.0.0.1:43110/)
+
+Task workflow example:
+
+```bash
+npm run comphony -- project list
+npm run comphony -- agent list --project product_core
+npm run comphony -- task create --project product_core --lane design --title "Plan dashboard refresh"
+npm run comphony -- task list --project product_core
+npm run comphony -- task autoassign --task task_0001
+npm run comphony -- task status --task task_0001 --status in_progress
+npm run comphony -- task work --task task_0001
+```
+
+Conversation workflow example:
+
+```bash
+npm run comphony -- thread create --title "Dashboard refresh request"
+npm run comphony -- message send --thread thread_0001 --body "Please design a cleaner dashboard UI for Product - Core."
+npm run comphony -- message list --thread thread_0001
+npm run comphony -- message promote --message msg_0001
+npm run comphony -- thread show --thread thread_0001
+npm run comphony -- thread ask --thread thread_0001 --body "What is the current status?"
+npm run comphony -- memory list --thread thread_0001
+```
+
+One-shot intake example:
+
+```bash
+npm run comphony -- intake create \
+  --title "Refresh Product - Core dashboard" \
+  --body "Please redesign the Product - Core dashboard UI and improve the UX."
+```
+
+Browser workflow example:
+
+- open [http://127.0.0.1:43110/](http://127.0.0.1:43110/)
+- submit an intake request
+- select a thread from the left column
+- send a follow-up question in the selected thread
+- assign the linked task, run a work turn, or move it to `in_progress`, `review`, or `done`
+- watch the event stream refresh automatically
+- inspect recent memory captured for the selected thread
+
+Build handoff rule:
+
+- assigning a task to a `build` or `publishing` agent requires these files in the canonical repo:
+  - `design-system/MASTER.md`
+  - `plans/design/design-plan.md`
+  - `plans/design/dev-handoff.md`
+
+Work turn behavior:
+
+- `task work` and `POST /v1/tasks/work` now create real local artifacts
+- `design` agents write the design system and handoff files into the canonical repo
+- `build`, `publishing`, and `coordination` agents write notes into the task workspace
+- the generated artifact paths are attached to the task record and echoed back into the thread
+- `task handoff` and `POST /v1/tasks/handoff` move work into the next lane and auto-assign the next eligible agent
+
 Available server endpoints:
 
 - `GET /healthz`
 - `GET /v1/status`
 - `GET /v1/projects`
 - `GET /v1/agents`
+- `GET /v1/tasks`
+- `GET /v1/threads`
+- `GET /v1/threads/:threadId`
+- `GET /v1/messages?threadId=<thread-id>`
+- `GET /v1/events?limit=20`
+- `GET /v1/events/stream`
+- `GET /v1/memory`
+- `POST /v1/intake`
+- `POST /v1/threads`
+- `POST /v1/threads/respond`
+- `POST /v1/messages`
+- `POST /v1/messages/promote`
+- `POST /v1/tasks/assign`
+- `POST /v1/tasks/handoff`
+- `POST /v1/tasks/work`
+- `POST /v1/tasks/status`
 
 ## Start Here
 

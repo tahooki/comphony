@@ -13,7 +13,7 @@ workspace:
   root: "<ABS_WORKSPACE_ROOT>/design"
 hooks:
   after_create: |
-    mkdir -p notes output
+    mkdir -p notes output plans/design design-system/pages
 agent:
   max_concurrent_agents: 2
   max_turns: 10
@@ -36,14 +36,19 @@ Rules:
 1. Do not make production code changes in this workflow unless the issue explicitly requests a design prototype.
 2. Start by generating or refining a design system direction. Prefer `ui-ux-pro-max` queries before freeform design decisions.
 3. Produce a concrete UX proposal with screen states, copy, and edge cases.
+4. Save the main design outputs under `design-system/` and `plans/design/`.
+5. Write both `plans/design/design-plan.md` and `plans/design/dev-handoff.md`.
+6. Treat the handoff note as an implementation contract, not a loose summary.
 4. Keep the `## Codex Workpad` comment updated with decisions and open questions.
-5. If the design is ready for implementation, move the issue to `Todo`.
-6. If additional discovery is needed, move the issue back to `Research`.
+7. If the design is ready for implementation, move the issue to `Todo`.
+8. If additional discovery is needed, move the issue back to `Research`.
 
 Expected outputs:
 
 - user flow
 - design system draft
+- `design-plan.md`
+- `dev-handoff.md`
 - UI states
 - copy guidance
 - edge cases

@@ -36,6 +36,56 @@ policies:
   repo_creation_requires_approval: true
   deploy_requires_approval: true
 
+routing:
+  default_project: product_core
+  default_lane: planning
+  lane_keywords:
+    research:
+      - research
+      - investigate
+      - analyze
+      - analysis
+    design:
+      - design
+      - redesign
+      - ux
+      - ui
+      - wireframe
+      - layout
+      - dashboard
+    planning:
+      - plan
+      - scope
+      - spec
+      - define
+    build:
+      - implement
+      - build
+      - code
+      - develop
+      - publish
+    review:
+      - review
+      - qa
+      - check
+  preferred_roles:
+    planning:
+      - coordination
+      - design
+    research:
+      - coordination
+      - design
+    design:
+      - design
+      - coordination
+    build:
+      - build
+      - publishing
+    review:
+      - publishing
+      - build
+      - coordination
+
 projects:
   - id: product_core
     name: Product - Core
@@ -83,6 +133,40 @@ agents:
       - implementation
       - repo_changes
       - review_response
+    permissions:
+      read_repo: allow
+      write_repo: guarded
+      run_commands: guarded
+    assigned_projects:
+      - product_core
+
+  - id: design_planner_01
+    name: Product Design Planner
+    role: design
+    source:
+      kind: local_package
+      ref: ./agents/design_planner_01
+    capabilities:
+      - design_system
+      - ui_direction
+      - design_handoff
+    permissions:
+      read_repo: allow
+      write_memory: allow
+      request_review: allow
+    assigned_projects:
+      - product_core
+
+  - id: frontend_publisher_01
+    name: Frontend Publisher
+    role: publishing
+    source:
+      kind: local_package
+      ref: ./agents/frontend_publisher_01
+    capabilities:
+      - frontend_implementation
+      - visual_qa
+      - handoff_execution
     permissions:
       read_repo: allow
       write_repo: guarded

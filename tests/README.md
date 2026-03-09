@@ -42,7 +42,36 @@ If you want the local HTTP runtime:
 npm run server:start
 ```
 
-## 4. Fill local environment values
+## 4. Check the task runtime flow
+
+Example:
+
+```bash
+npm run comphony -- project list
+npm run comphony -- agent list --project product_core
+npm run comphony -- task create --project product_core --lane design --title "Draft a design plan"
+npm run comphony -- task list --project product_core
+```
+
+Conversation-to-task example:
+
+```bash
+npm run comphony -- thread create --title "Dashboard refresh request"
+npm run comphony -- message send --thread thread_0001 --body "Please design a cleaner dashboard UI for Product - Core."
+npm run comphony -- message promote --message msg_0001
+npm run comphony -- task list --project product_core
+```
+
+One-shot intake example:
+
+```bash
+npm run comphony -- intake create \
+  --title "Refresh Product - Core dashboard" \
+  --body "Please redesign the Product - Core dashboard UI and improve the UX."
+npm run comphony -- event list --limit 10
+```
+
+## 5. Fill local environment values
 
 Edit `.env` and set at least:
 
@@ -53,7 +82,7 @@ Edit `.env` and set at least:
 - `COMPHONY_WORKSPACE_ROOT`
 - `COMPHONY_WORKFLOW_ROOT`
 
-## 5. Ask Codex to do the setup
+## 6. Ask Codex to do the setup
 
 Example prompt:
 
@@ -63,7 +92,7 @@ Create any missing local setup files yourself, including MISSION.md.
 Keep going until the current Comphony runtime foundation is working end-to-end.
 ```
 
-## 6. Validate the result
+## 7. Validate the result
 
 Run:
 
@@ -82,7 +111,7 @@ If you also want network checks:
 - Symphony dashboard reachability check
 - Linear API key validation through GraphQL
 
-## 7. Reset and test again
+## 8. Reset and test again
 
 To clear local generated state and repeat the setup flow:
 

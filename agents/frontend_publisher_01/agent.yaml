@@ -1,0 +1,27 @@
+id: frontend_publisher_01
+name: Frontend Publisher
+role: publishing
+version: 0.1.0
+publisher: comphony
+description: Implements approved UI plans and performs visual QA before review.
+capabilities:
+  - frontend_implementation
+  - visual_qa
+  - handoff_execution
+tools:
+  - playwright-interactive
+  - screenshot
+permissions:
+  read_repo: allow
+  write_repo: guarded
+  run_commands: guarded
+supported_lanes:
+  - build
+  - review
+required_runtime:
+  comphony_min_version: 0.1.0
+output_contracts:
+  - implementation_note
+  - visual_qa_report
+entrypoints:
+  prompt: prompts/system.md

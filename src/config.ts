@@ -11,6 +11,13 @@ export type ValidationResult = {
   warnings: string[];
 };
 
+export type RoutingPolicy = {
+  defaultProject: string | null;
+  defaultLane: string;
+  laneKeywords: Record<string, string[]>;
+  preferredRoles: Record<string, string[]>;
+};
+
 export class ConfigError extends Error {}
 
 type StringMap = Record<string, unknown>;
@@ -30,6 +37,7 @@ export function validateCompanyConfig(config: JSONObject, root: string): Validat
 
   const company = expectMap(config, "company", errors);
   const runtime = expectMap(config, "runtime", errors);
+  const routing = expectMap(config, "routing", errors);
   const projects = expectList(config, "projects", errors);
   const agents = expectList(config, "agents", errors);
 
@@ -52,6 +60,16 @@ export function validateCompanyConfig(config: JSONObject, root: string): Validat
       requireString(localServer, "host", "runtime.local_server", errors);
       requireInteger(localServer, "port", "runtime.local_server", errors);
     }
+  }
+
+  if (routing) {
+    const defaultProject = routing.default_project;
+    if (defaultProject !== undefined && defaultProject !== null && typeof defaultProject !== "string") {
+      errors.push("routing.default_project must be a string when provided.");
+    }
+    requireString(routing, "default_lane", "routing", errors);
+    validateStringListMap(routing.lane_keywords, "routing.lane_keywords", errors);
+    validateStringListMap(routing.preferred_roles, "routing.preferred_roles", errors);
   }
 
   const projectIds = new Set<string>();
@@ -143,6 +161,16 @@ export function summarizeCompanyConfig(config: JSONObject): JSONObject {
   };
 }
 
+export function resolveRoutingPolicy(config: JSONObject): RoutingPolicy {
+  const routing = isMap(config.routing) ? config.routing : {};
+  return {
+    defaultProject: typeof routing.default_project === "string" ? routing.default_project : null,
+    defaultLane: typeof routing.default_lane === "string" ? routing.default_lane : "planning",
+    laneKeywords: readStringListMap(routing.lane_keywords),
+    preferredRoles: readStringListMap(routing.preferred_roles)
+  };
+}
+
 function expectMap(payload: StringMap, key: string, errors: string[], parent?: string): StringMap | null {
   const value = payload[key];
   const label = parent ? `${parent}.${key}` : key;
@@ -186,6 +214,31 @@ function requireInteger(payload: StringMap, key: string, parent: string, errors:
     return 0;
   }
   return value;
+}
+
+function validateStringListMap(value: unknown, label: string, errors: string[]): void {
+  if (!isMap(value)) {
+    errors.push(`${label} must be a mapping of string arrays.`);
+    return;
+  }
+  Object.entries(value).forEach(([key, entry]) => {
+    if (!Array.isArray(entry) || !entry.every((item) => typeof item === "string")) {
+      errors.push(`${label}.${key} must be a list of strings.`);
+    }
+  });
+}
+
+function readStringListMap(value: unknown): Record<string, string[]> {
+  if (!isMap(value)) {
+    return {};
+  }
+  const output: Record<string, string[]> = {};
+  Object.entries(value).forEach(([key, entry]) => {
+    if (Array.isArray(entry)) {
+      output[key] = entry.filter((item): item is string => typeof item === "string");
+    }
+  });
+  return output;
 }
 
 function isMap(value: unknown): value is StringMap {
