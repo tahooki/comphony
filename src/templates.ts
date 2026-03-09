@@ -20,8 +20,8 @@ sync:
       enabled: false
       team_key: TAH
     supabase:
-      enabled: false
-      project_ref: local-dev
+      enabled: true
+      project_ref: bgiwrjvhylumcziwcbwk
 
 auth:
   local_users:

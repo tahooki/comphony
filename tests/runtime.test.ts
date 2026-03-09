@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 import { loadCompanyConfig, validateCompanyConfig } from "../src/config.js";
+import { resetLoadedEnvironmentForTests } from "../src/env.js";
 import {
   addMessage,
   assignTask,
@@ -15,19 +16,24 @@ import {
   completeTaskReview,
   continueThread,
   createProject,
+  createSession,
   createThread,
   createTask,
   decideApproval,
   getThreadDetail,
   handoffTask,
+  ingestConnectorMessage,
   intakeRequest,
+  listAgentCatalog,
   listApprovals,
   listConsultations,
   listMemories,
   listPeopleOverview,
   listProjectOverview,
   listReviews,
+  listSessions,
   listSyncRecords,
+  pushRuntimeToProvider,
   recommendMemories,
   recommendTasks,
   listAgents,
@@ -43,6 +49,8 @@ import {
   requestTaskReview,
   retrySync,
   resolveConsultation,
+  resolveSession,
+  revokeSession,
   runTaskWorkTurn,
   installAgentPackage,
   syncTaskToProvider,
@@ -57,6 +65,35 @@ test("repository company config validates", () => {
   const config = loadCompanyConfig(resolve(root, "company.yaml"));
   const result = validateCompanyConfig(config, root);
   assert.deepEqual(result.errors, []);
+});
+
+test("loading company config also loads root .env values when missing", () => {
+  const tempRoot = mkdtempSync(resolve(tmpdir(), "comphony-env-"));
+  writeFileSync(resolve(tempRoot, ".env"), "SUPABASE_URL=https://example.supabase.co\nTEST_QUOTED='hello world'\n", "utf8");
+  writeFileSync(resolve(tempRoot, "company.yaml"), DEFAULT_COMPANY_YAML, "utf8");
+  const previousSupabaseUrl = process.env.SUPABASE_URL;
+  const previousQuoted = process.env.TEST_QUOTED;
+  delete process.env.SUPABASE_URL;
+  delete process.env.TEST_QUOTED;
+  resetLoadedEnvironmentForTests();
+
+  try {
+    loadCompanyConfig(resolve(tempRoot, "company.yaml"));
+    assert.equal(process.env.SUPABASE_URL, "https://example.supabase.co");
+    assert.equal(process.env.TEST_QUOTED, "hello world");
+  } finally {
+    resetLoadedEnvironmentForTests();
+    if (previousSupabaseUrl === undefined) {
+      delete process.env.SUPABASE_URL;
+    } else {
+      process.env.SUPABASE_URL = previousSupabaseUrl;
+    }
+    if (previousQuoted === undefined) {
+      delete process.env.TEST_QUOTED;
+    } else {
+      process.env.TEST_QUOTED = previousQuoted;
+    }
+  }
 });
 
 test("company config exposes the expected runtime metadata", () => {
@@ -608,6 +645,45 @@ test("runtime can install an agent package and assign it to a project", () => {
   assert.equal(listAgents(state, "product_core").some((item) => item.id === agent.id), true);
 });
 
+test("session lifecycle creates resolves and revokes tokens", () => {
+  const config = loadCompanyConfig(resolve(root, "company.yaml"));
+  const state = loadRuntimeState(config, root);
+  const session = createSession(config, state, {
+    actorId: "owner_01",
+    label: "web"
+  });
+
+  assert.equal(listSessions(state, { activeOnly: true }).some((item) => item.id === session.id), true);
+  assert.equal(resolveSession(state, { token: session.token })?.actorId, "owner_01");
+
+  const revoked = revokeSession(state, { sessionId: session.id });
+  assert.equal(revoked.revokedAt !== null, true);
+  assert.equal(resolveSession(state, { token: session.token }), null);
+});
+
+test("agent catalog exposes installed cached registry agents", () => {
+  const tempRoot = mkdtempSync(resolve(tmpdir(), "comphony-agent-catalog-"));
+  writeFileSync(resolve(tempRoot, "company.yaml"), DEFAULT_COMPANY_YAML, "utf8");
+  mkdirSync(resolve(tempRoot, "runtime-data", "registry", "agents", "cached_agent_01"), { recursive: true });
+  mkdirSync(resolve(tempRoot, "runtime-data"), { recursive: true });
+  const config = loadCompanyConfig(resolve(tempRoot, "company.yaml"));
+  const state = loadRuntimeState(config, tempRoot);
+  state.agents.push({
+    id: "cached_agent_01",
+    name: "Cached Agent",
+    role: "research",
+    assignedProjects: ["product_core"],
+    sourceKind: "registry_package",
+    sourceRef: "https://registry.example.com/cached-agent-01",
+    trustState: "restricted"
+  });
+
+  const catalog = listAgentCatalog(state, tempRoot);
+  const entry = catalog.find((item) => item.id === "cached_agent_01");
+  assert.equal(Boolean(entry), true);
+  assert.equal(entry?.cachedPath?.includes("cached_agent_01"), true);
+});
+
 test("registry package install can fetch a remote manifest and cache it locally", async () => {
   const tempRoot = mkdtempSync(resolve(tmpdir(), "comphony-registry-agent-"));
   writeFileSync(resolve(tempRoot, "company.yaml"), DEFAULT_COMPANY_YAML, "utf8");
@@ -673,6 +749,32 @@ test("people and project overview reflect current runtime state", () => {
   assert.equal(projects.some((project) => project.id === "product_core" && project.activeTaskCount >= 1), true);
 });
 
+test("connector ingestion can create intake and follow-up messages", () => {
+  const config = loadCompanyConfig(resolve(root, "company.yaml"));
+  const mutable = structuredClone(config) as typeof config;
+  ((mutable.connectors as { telegram: { enabled: boolean } }).telegram).enabled = true;
+  const state = loadRuntimeState(mutable, root);
+
+  const first = ingestConnectorMessage(mutable, root, state, {
+    provider: "telegram",
+    body: "Please redesign the Product - Core dashboard UI.",
+    senderId: "tg_001",
+    senderName: "Alice"
+  });
+  assert.equal(first.mode, "intake");
+  assert.equal(first.taskId !== null, true);
+
+  const second = ingestConnectorMessage(mutable, root, state, {
+    provider: "telegram",
+    body: "What is the current status?",
+    senderId: "tg_001",
+    senderName: "Alice",
+    threadId: first.threadId
+  });
+  assert.equal(second.mode, "follow_up");
+  assert.equal(getThreadDetail(state, first.threadId).messages.length >= 3, true);
+});
+
 test("sync retry records a sync event when provider is enabled", () => {
   const config = loadCompanyConfig(resolve(root, "company.yaml"));
   const mutable = structuredClone(config) as typeof config;
@@ -687,6 +789,78 @@ test("sync retry records a sync event when provider is enabled", () => {
 
   assert.equal(record.status, "retried");
   assert.equal(listSyncRecords(state, { provider: "linear" }).length >= 1, true);
+});
+
+test("supabase runtime push mirrors snapshot and events", async () => {
+  const tempRoot = mkdtempSync(resolve(tmpdir(), "comphony-supabase-sync-"));
+  writeFileSync(resolve(tempRoot, "company.yaml"), DEFAULT_COMPANY_YAML, "utf8");
+  mkdirSync(resolve(tempRoot, "runtime-data"), { recursive: true });
+  const config = loadCompanyConfig(resolve(tempRoot, "company.yaml"));
+  const mutable = structuredClone(config) as typeof config;
+  (mutable.sync as { providers: { supabase: { enabled: boolean; project_ref: string } } }).providers.supabase.enabled = true;
+  const state = loadRuntimeState(mutable, tempRoot);
+  intakeRequest(mutable, tempRoot, state, {
+    title: "Supabase push task",
+    body: "Please redesign the Product - Core dashboard UI."
+  });
+
+  const seenBodiesPath = resolve(tempRoot, "supabase-seen.log");
+  writeFileSync(seenBodiesPath, "", "utf8");
+  const portServer = createServer();
+  await new Promise<void>((resolvePromise) => portServer.listen(0, "127.0.0.1", () => resolvePromise()));
+  const address = portServer.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Supabase mock did not expose a TCP port");
+  }
+  const port = address.port;
+  await new Promise<void>((resolvePromise, rejectPromise) => portServer.close((error) => error ? rejectPromise(error) : resolvePromise()));
+
+  const serverScript = `
+    const { createServer } = require("node:http");
+    const { appendFileSync } = require("node:fs");
+    const port = Number(process.argv[1]);
+    const seenBodiesPath = process.argv[2];
+    const server = createServer((request, response) => {
+      const chunks = [];
+      request.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+      request.on("end", () => {
+        appendFileSync(seenBodiesPath, request.url + "\\t" + Buffer.concat(chunks).toString("utf8") + "\\n");
+        response.writeHead(201, { "Content-Type": "application/json" });
+        response.end("[]");
+      });
+    });
+    server.listen(port, "127.0.0.1");
+  `;
+  const server = spawn(process.execPath, ["-e", serverScript, String(port), seenBodiesPath], {
+    stdio: ["ignore", "ignore", "inherit"]
+  });
+  await new Promise((resolvePromise) => setTimeout(resolvePromise, 250));
+
+  const previousSupabaseUrl = process.env.SUPABASE_URL;
+  const previousSupabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  process.env.SUPABASE_URL = `http://127.0.0.1:${port}`;
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
+  try {
+    const record = pushRuntimeToProvider(mutable, tempRoot, state, {
+      provider: "supabase"
+    });
+    const seen = readFileSync(seenBodiesPath, "utf8");
+    assert.equal(record.provider, "supabase");
+    assert.equal(seen.includes("/rest/v1/comphony_runtime_snapshots"), true);
+    assert.equal(seen.includes("/rest/v1/comphony_events"), true);
+  } finally {
+    server.kill("SIGTERM");
+    if (previousSupabaseUrl === undefined) {
+      delete process.env.SUPABASE_URL;
+    } else {
+      process.env.SUPABASE_URL = previousSupabaseUrl;
+    }
+    if (previousSupabaseKey === undefined) {
+      delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    } else {
+      process.env.SUPABASE_SERVICE_ROLE_KEY = previousSupabaseKey;
+    }
+  }
 });
 
 test("task sync can create or update a Linear issue through the configured provider", async () => {

@@ -166,6 +166,8 @@ Comphony now includes a simple local setup test flow:
 
 The local environment template is tracked as [.env.example](.env.example), while `.env` itself stays ignored.
 
+The runtime auto-loads `.env` and `.env.local` from the same directory as [company.yaml](/Users/tahooki/Documents/comphony/company.yaml). That means `npm run comphony -- ...` and `npm run server:start` pick up Supabase, Linear, and local runtime secrets without requiring a manual `export` step.
+
 ## Runtime MVP
 
 The repo now includes the first real local runtime slice:
@@ -177,7 +179,7 @@ The repo now includes the first real local runtime slice:
 - [tsconfig.json](/Users/tahooki/Documents/comphony/tsconfig.json)
   - TypeScript compiler configuration
 - [src/cli.ts](/Users/tahooki/Documents/comphony/src/cli.ts)
-  - `init`, `validate`, `project list/overview/create`, `agent list/install/assign-project`, `people list`, `task create/list/assign/autoassign/status/work/recommend/sync`, `consult`, `review`, `approval`, `sync list/retry`, `thread show/continue/ask`, and `server start`
+  - `init`, `validate`, `project list/overview/create`, `agent list/catalog/install/assign-project`, `people list`, `task create/list/assign/autoassign/status/work/recommend/sync`, `consult`, `review`, `approval`, `sync list/push/retry`, `session list/create/revoke`, `connector ingest`, `thread show/continue/ask`, and `server start`
 - [src/server.ts](/Users/tahooki/Documents/comphony/src/server.ts)
   - minimal HTTP runtime
 - [src/state.ts](/Users/tahooki/Documents/comphony/src/state.ts)
@@ -211,11 +213,15 @@ npm run comphony -- people list
 npm run comphony -- project create --id research_lab --name "Research Lab" --lanes planning,research --repo-slug research-lab
 npm run comphony -- agent install --source-kind local_package --ref ./agents/design_planner_01
 npm run comphony -- agent install --source-kind registry_package --ref https://registry.example.com/agents/remote-designer
+npm run comphony -- agent catalog
 npm run comphony -- agent assign-project --agent design_planner_01 --project product_core
 npm run comphony -- consult request --task task_0001 --agent desk_coordinator --reason "Need clarification"
 npm run comphony -- review request --task task_0001 --reviewer frontend_publisher_01 --reason "Ready for review"
 npm run comphony -- approval request --task task_0001 --action external_sync --reason "Needs explicit approval"
 npm run comphony -- task sync --task task_0001 --provider linear
+npm run comphony -- session create --actor owner_01 --label "mobile"
+npm run comphony -- sync push --provider supabase
+npm run comphony -- connector ingest --provider telegram --sender-id tg_001 --body "Please redesign the dashboard UI."
 npm run comphony -- sync list
 ```
 
@@ -258,7 +264,14 @@ Browser workflow example:
 HTTP auth note:
 
 - when `auth.require_auth_for_remote_clients` is enabled, mutation endpoints require `X-Comphony-Actor-Id`
+- or a session token through `Authorization: Bearer <token>` or `X-Comphony-Session-Token`
 - the bundled web UI sends `owner_01` by default for local use
+
+Remote control plane note:
+
+- `POST /v1/sync/push` mirrors the current runtime snapshot and recent events to Supabase when the provider is enabled
+- `POST /v1/connectors/<provider>/messages` lets Telegram, Discord, or Slack act as remote Comphony inboxes
+- `POST /v1/auth/login` and `POST /v1/auth/logout` provide lightweight local-first session handling
 
 Build handoff rule:
 
@@ -284,11 +297,14 @@ Available server endpoints:
 
 - `GET /healthz`
 - `GET /v1/status`
+- `GET /v1/auth/session`
 - `GET /v1/tasks/recommend`
 - `GET /v1/projects`
 - `GET /v1/projects/overview`
 - `GET /v1/agents`
+- `GET /v1/agents/catalog`
 - `GET /v1/people`
+- `GET /v1/sessions`
 - `GET /v1/tasks`
 - `GET /v1/threads`
 - `GET /v1/threads/:threadId`
@@ -321,6 +337,12 @@ Available server endpoints:
 - `POST /v1/projects`
 - `POST /v1/agents/install`
 - `POST /v1/agents/assign-project`
+- `POST /v1/auth/login`
+- `POST /v1/auth/logout`
+- `POST /v1/connectors/telegram/messages`
+- `POST /v1/connectors/discord/messages`
+- `POST /v1/connectors/slack/messages`
+- `POST /v1/sync/push`
 - `POST /v1/sync/retry`
 
 ## Start Here

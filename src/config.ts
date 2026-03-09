@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import YAML from "yaml";
+
+import { loadEnvironment } from "./env.js";
 
 export type Primitive = string | number | boolean | null;
 export type JSONObject = { [key: string]: JSONValue };
@@ -23,6 +25,7 @@ export class ConfigError extends Error {}
 type StringMap = Record<string, unknown>;
 
 export function loadCompanyConfig(path: string): JSONObject {
+  loadEnvironment(dirname(path));
   const raw = readFileSync(path, "utf8");
   const parsed = YAML.parse(raw) as unknown;
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {

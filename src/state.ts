@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { randomBytes, randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import YAML from "yaml";
 
@@ -207,6 +208,37 @@ export type ContinueThreadResult = {
   notes: string[];
 };
 
+export type SessionRecord = {
+  id: string;
+  actorId: string;
+  role: string;
+  label: string | null;
+  token: string;
+  createdAt: string;
+  lastSeenAt: string;
+  revokedAt: string | null;
+};
+
+export type AgentCatalogEntry = {
+  id: string;
+  name: string;
+  role: string;
+  sourceKind: string | null;
+  sourceRef: string | null;
+  trustState: RuntimeAgent["trustState"];
+  assignedProjects: string[];
+  installed: boolean;
+  cachedPath: string | null;
+};
+
+export type ConnectorIngestResult = {
+  provider: string;
+  mode: "intake" | "follow_up";
+  threadId: string;
+  taskId: string | null;
+  messageId: string;
+};
+
 export type RuntimeState = {
   version: number;
   projects: RuntimeProject[];
@@ -220,6 +252,7 @@ export type RuntimeState = {
   reviews: ReviewRecord[];
   approvals: ApprovalRecord[];
   syncRecords: SyncRecord[];
+  sessions: SessionRecord[];
   counters: {
     task: number;
     thread: number;
@@ -230,6 +263,7 @@ export type RuntimeState = {
     review: number;
     approval: number;
     sync: number;
+    session: number;
   };
 };
 
@@ -258,6 +292,7 @@ const DEFAULT_STATE: RuntimeState = {
   reviews: [],
   approvals: [],
   syncRecords: [],
+  sessions: [],
   counters: {
     task: 0,
     thread: 0,
@@ -267,7 +302,8 @@ const DEFAULT_STATE: RuntimeState = {
     consultation: 0,
     review: 0,
     approval: 0,
-    sync: 0
+    sync: 0,
+    session: 0
   }
 };
 
@@ -342,6 +378,102 @@ export function listProjectOverview(state: RuntimeState): ProjectOverview[] {
       latestArtifactPath
     };
   });
+}
+
+export function listAgentCatalog(state: RuntimeState, root: string): AgentCatalogEntry[] {
+  const cachedRoot = resolve(root, "runtime-data", "registry", "agents");
+  const cachedIds = existsSync(cachedRoot)
+    ? readdirSync(cachedRoot, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+    : [];
+  return state.agents.map((agent) => ({
+    id: agent.id,
+    name: agent.name,
+    role: agent.role,
+    sourceKind: agent.sourceKind,
+    sourceRef: agent.sourceRef,
+    trustState: agent.trustState,
+    assignedProjects: agent.assignedProjects,
+    installed: true,
+    cachedPath: cachedIds.includes(agent.id) ? resolve(cachedRoot, agent.id) : null
+  }));
+}
+
+export function listSessions(state: RuntimeState, filters?: { actorId?: string; activeOnly?: boolean }): SessionRecord[] {
+  return state.sessions
+    .filter((session) => {
+      if (filters?.actorId && session.actorId !== filters.actorId) {
+        return false;
+      }
+      if (filters?.activeOnly && session.revokedAt !== null) {
+        return false;
+      }
+      return true;
+    })
+    .slice()
+    .sort((left, right) => right.lastSeenAt.localeCompare(left.lastSeenAt));
+}
+
+export function createSession(
+  config: JSONObject,
+  state: RuntimeState,
+  input: { actorId: string; label?: string }
+): SessionRecord {
+  const actor = findConfiguredActor(config, input.actorId);
+  const now = new Date().toISOString();
+  const session: SessionRecord = {
+    id: `session_${String(state.counters.session + 1).padStart(4, "0")}_${randomUUID().slice(0, 8)}`,
+    actorId: actor.id,
+    role: actor.role,
+    label: input.label ?? null,
+    token: randomBytes(24).toString("hex"),
+    createdAt: now,
+    lastSeenAt: now,
+    revokedAt: null
+  };
+  state.counters.session += 1;
+  state.sessions.push(session);
+  appendEvent(state, {
+    type: "session.created",
+    entityType: "system",
+    entityId: session.id,
+    timestamp: now,
+    payload: {
+      actorId: session.actorId,
+      role: session.role
+    }
+  });
+  return session;
+}
+
+export function revokeSession(state: RuntimeState, input: { sessionId: string }): SessionRecord {
+  const session = state.sessions.find((item) => item.id === input.sessionId);
+  if (!session) {
+    throw new Error(`Unknown session id: ${input.sessionId}`);
+  }
+  if (session.revokedAt === null) {
+    session.revokedAt = new Date().toISOString();
+    session.lastSeenAt = session.revokedAt;
+    appendEvent(state, {
+      type: "session.revoked",
+      entityType: "system",
+      entityId: session.id,
+      timestamp: session.revokedAt,
+      payload: {
+        actorId: session.actorId
+      }
+    });
+  }
+  return session;
+}
+
+export function resolveSession(state: RuntimeState, input: { token: string }): SessionRecord | null {
+  const session = state.sessions.find((item) => item.token === input.token && item.revokedAt === null) ?? null;
+  if (session) {
+    session.lastSeenAt = new Date().toISOString();
+  }
+  return session;
 }
 
 export function createProject(
@@ -648,6 +780,42 @@ export function retrySync(
   return record;
 }
 
+export function pushRuntimeToProvider(
+  config: JSONObject,
+  root: string,
+  state: RuntimeState,
+  input: { provider: string; reason?: string }
+): SyncRecord {
+  if (input.provider !== "supabase") {
+    throw new Error(`Unsupported runtime sync provider: ${input.provider}`);
+  }
+  const providerConfig = getSyncProviderConfig(config, "supabase");
+  syncRuntimeToSupabase(config, providerConfig, state);
+  const now = new Date().toISOString();
+  const record: SyncRecord = {
+    id: nextSyncId(state),
+    provider: input.provider,
+    mode: "control_plane_push",
+    projectId: null,
+    taskId: null,
+    status: "retried",
+    reason: input.reason ?? "Runtime snapshot pushed",
+    createdAt: now,
+    updatedAt: now
+  };
+  state.syncRecords.push(record);
+  appendEvent(state, {
+    type: "sync.runtime_pushed",
+    entityType: "system",
+    entityId: record.id,
+    timestamp: now,
+    payload: {
+      provider: record.provider
+    }
+  });
+  return record;
+}
+
 export function syncTaskToProvider(
   config: JSONObject,
   root: string,
@@ -699,6 +867,70 @@ export function syncTaskToProvider(
     }
   });
   return { task, ref };
+}
+
+export function ingestConnectorMessage(
+  config: JSONObject,
+  root: string,
+  state: RuntimeState,
+  input: {
+    provider: "telegram" | "discord" | "slack";
+    body: string;
+    senderId: string;
+    senderName?: string;
+    threadId?: string;
+    title?: string;
+  }
+): ConnectorIngestResult {
+  ensureConnectorEnabled(config, input.provider);
+  const label = input.senderName?.trim() || input.senderId;
+  if (input.threadId) {
+    const response = respondToThread(config, state, {
+      threadId: input.threadId,
+      body: input.body
+    });
+    appendEvent(state, {
+      type: "connector.message_ingested",
+      entityType: "system",
+      entityId: response.responseMessage.id,
+      timestamp: response.responseMessage.createdAt,
+      payload: {
+        provider: input.provider,
+        senderId: input.senderId,
+        threadId: input.threadId
+      }
+    });
+    return {
+      provider: input.provider,
+      mode: "follow_up",
+      threadId: input.threadId,
+      taskId: getThreadDetail(state, input.threadId).tasks[0]?.id ?? null,
+      messageId: response.userMessage.id
+    };
+  }
+
+  const intake = intakeRequest(config, root, state, {
+    title: input.title ?? `${capitalizeLane(input.provider)} request from ${label}`,
+    body: input.body
+  });
+  appendEvent(state, {
+    type: "connector.message_ingested",
+    entityType: "system",
+    entityId: intake.message.id,
+    timestamp: intake.message.createdAt,
+    payload: {
+      provider: input.provider,
+      senderId: input.senderId,
+      threadId: intake.thread.id
+    }
+  });
+  return {
+    provider: input.provider,
+    mode: "intake",
+    threadId: intake.thread.id,
+    taskId: intake.task.id,
+    messageId: intake.message.id
+  };
 }
 
 export function recommendMemories(
@@ -2224,7 +2456,8 @@ function syncCatalogFromConfig(config: JSONObject, state: RuntimeState): Runtime
       consultations: state.consultations ?? [],
       reviews: state.reviews ?? [],
       approvals: state.approvals ?? [],
-      syncRecords: state.syncRecords ?? []
+      syncRecords: state.syncRecords ?? [],
+      sessions: state.sessions ?? []
     }),
     tasks: (state.tasks ?? []).map((task) => ({
       ...task,
@@ -2280,6 +2513,11 @@ function syncCatalogFromConfig(config: JSONObject, state: RuntimeState): Runtime
       ...record,
       projectId: typeof record.projectId === "string" ? record.projectId : null,
       taskId: typeof record.taskId === "string" ? record.taskId : null
+    })),
+    sessions: (state.sessions ?? []).map((session) => ({
+      ...session,
+      label: typeof session.label === "string" ? session.label : null,
+      revokedAt: typeof session.revokedAt === "string" ? session.revokedAt : null
     })),
     projects: [],
     agents: []
@@ -2389,7 +2627,8 @@ function normalizeCounters(state: Partial<RuntimeState>): RuntimeState["counters
     consultation: safeCounterValue(state.counters?.consultation, state.consultations?.length ?? 0),
     review: safeCounterValue(state.counters?.review, state.reviews?.length ?? 0),
     approval: safeCounterValue(state.counters?.approval, state.approvals?.length ?? 0),
-    sync: safeCounterValue(state.counters?.sync, state.syncRecords?.length ?? 0)
+    sync: safeCounterValue(state.counters?.sync, state.syncRecords?.length ?? 0),
+    session: safeCounterValue(state.counters?.session, state.sessions?.length ?? 0)
   };
 }
 
@@ -2710,6 +2949,27 @@ function ensureExternalSyncApproval(
   }
 }
 
+function findConfiguredActor(config: JSONObject, actorId: string): { id: string; role: string } {
+  const auth = asMap(config.auth);
+  const localUsers = Array.isArray(auth?.local_users) ? auth.local_users : [];
+  const actor = localUsers.find((entry) => asMap(entry)?.id === actorId);
+  if (!actor) {
+    throw new Error(`Unknown actor id: ${actorId}`);
+  }
+  return {
+    id: actorId,
+    role: typeof asMap(actor)?.role === "string" ? String(asMap(actor)?.role) : "observer"
+  };
+}
+
+function ensureConnectorEnabled(config: JSONObject, provider: "telegram" | "discord" | "slack"): void {
+  const connectors = asMap(config.connectors);
+  const providerConfig = asMap(connectors?.[provider]);
+  if (providerConfig?.enabled !== true) {
+    throw new Error(`Connector ${provider} is not enabled`);
+  }
+}
+
 function getSyncProviderConfig(config: JSONObject, provider: string): Record<string, unknown> {
   const sync = asMap(config.sync);
   const providers = asMap(sync?.providers);
@@ -2718,6 +2978,78 @@ function getSyncProviderConfig(config: JSONObject, provider: string): Record<str
     throw new Error(`Sync provider ${provider} is not enabled`);
   }
   return providerConfig;
+}
+
+function syncRuntimeToSupabase(
+  config: JSONObject,
+  providerConfig: Record<string, unknown>,
+  state: RuntimeState
+): void {
+  const projectRef = typeof providerConfig.project_ref === "string" ? providerConfig.project_ref : "local-dev";
+  const supabaseUrl = process.env.SUPABASE_URL ?? (projectRef !== "local-dev" ? `https://${projectRef}.supabase.co` : undefined);
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set");
+  }
+  const company = asMap(config.company);
+  const companySlug = typeof company?.slug === "string" ? company.slug : "comphony";
+  const snapshotBody = {
+    company_slug: companySlug,
+    project_ref: projectRef,
+    generated_at: new Date().toISOString(),
+    snapshot: {
+      projects: state.projects,
+      agents: state.agents,
+      tasks: state.tasks,
+      threads: state.threads,
+      messages: state.messages.slice(-200),
+      approvals: state.approvals,
+      reviews: state.reviews,
+      consultations: state.consultations,
+      sync_records: state.syncRecords,
+      sessions: state.sessions.map((session) => ({
+        id: session.id,
+        actor_id: session.actorId,
+        role: session.role,
+        label: session.label,
+        created_at: session.createdAt,
+        last_seen_at: session.lastSeenAt,
+        revoked_at: session.revokedAt
+      }))
+    }
+  };
+  fetchTextSync(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/comphony_runtime_snapshots`, {
+    method: "POST",
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify(snapshotBody)
+  });
+  const recentEvents = listEvents(state, 50).map((event) => ({
+    company_slug: companySlug,
+    project_ref: projectRef,
+    event_id: event.id,
+    event_type: event.type,
+    entity_type: event.entityType,
+    entity_id: event.entityId,
+    occurred_at: event.timestamp,
+    payload: event.payload
+  }));
+  if (recentEvents.length > 0) {
+    fetchTextSync(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/comphony_events`, {
+      method: "POST",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify(recentEvents)
+    });
+  }
 }
 
 function getProjectSyncName(config: JSONObject, projectId: string): string | null {

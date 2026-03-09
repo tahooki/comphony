@@ -12,18 +12,23 @@ import {
   continueThread,
   createProject,
   createThread,
+  createSession,
   createTask,
   decideApproval,
   getThreadDetail,
   handoffTask,
+  ingestConnectorMessage,
   intakeRequest,
+  listAgentCatalog,
   listApprovals,
   listConsultations,
   listMemories,
   listPeopleOverview,
   listProjectOverview,
   listReviews,
+  listSessions,
   listSyncRecords,
+  pushRuntimeToProvider,
   recommendMemories,
   recommendTasks,
   listAgents,
@@ -38,6 +43,7 @@ import {
   requestApproval,
   requestConsultation,
   requestTaskReview,
+  revokeSession,
   resolveConsultation,
   retrySync,
   runTaskWorkTurn,
@@ -56,6 +62,7 @@ type Command =
   | { kind: "project-overview" }
   | { kind: "project-create"; projectId: string; name: string; purpose?: string; lanes: string[]; repoSlug?: string }
   | { kind: "agent-list"; projectId?: string }
+  | { kind: "agent-catalog" }
   | { kind: "people-list" }
   | { kind: "agent-install"; sourceKind: "local_package" | "registry_package"; ref: string; trustState?: "trusted" | "restricted" | "quarantined" }
   | { kind: "agent-assign-project"; agentId: string; projectId: string }
@@ -78,7 +85,12 @@ type Command =
   | { kind: "approval-request"; action: string; reason: string; taskId?: string; actorId?: string }
   | { kind: "approval-decide"; approvalId: string; decision: "granted" | "denied"; actorId?: string; notes?: string }
   | { kind: "sync-list"; provider?: string; projectId?: string; status?: string }
+  | { kind: "sync-push"; provider: string; reason?: string }
   | { kind: "sync-retry"; provider: string; projectId?: string; taskId?: string; reason?: string }
+  | { kind: "session-list"; actorId?: string; activeOnly: boolean }
+  | { kind: "session-create"; actorId: string; label?: string }
+  | { kind: "session-revoke"; sessionId: string }
+  | { kind: "connector-ingest"; provider: "telegram" | "discord" | "slack"; body: string; senderId: string; senderName?: string; threadId?: string; title?: string }
   | { kind: "thread-create"; title: string }
   | { kind: "thread-list" }
   | { kind: "thread-show"; threadId: string }
@@ -118,6 +130,8 @@ export function main(argv = process.argv.slice(2)): number {
         return runProjectCreate(root, configPath, parsed.command);
       case "agent-list":
         return runAgentList(root, configPath, parsed.command.projectId);
+      case "agent-catalog":
+        return runAgentCatalog(root, configPath);
       case "people-list":
         return runPeopleList(root, configPath);
       case "agent-install":
@@ -162,8 +176,18 @@ export function main(argv = process.argv.slice(2)): number {
         return runApprovalDecide(root, configPath, parsed.command);
       case "sync-list":
         return runSyncList(root, configPath, parsed.command);
+      case "sync-push":
+        return runSyncPush(root, configPath, parsed.command);
       case "sync-retry":
         return runSyncRetry(root, configPath, parsed.command);
+      case "session-list":
+        return runSessionList(root, configPath, parsed.command);
+      case "session-create":
+        return runSessionCreate(root, configPath, parsed.command);
+      case "session-revoke":
+        return runSessionRevoke(root, configPath, parsed.command);
+      case "connector-ingest":
+        return runConnectorIngest(root, configPath, parsed.command);
       case "thread-create":
         return runThreadCreate(root, configPath, parsed.command.title);
       case "thread-list":
@@ -263,6 +287,9 @@ function parseArgs(argv: string[]): ParsedArgs {
         projectId: getOptionValue(argv.slice(index + 2), "--project")
       }
     };
+  }
+  if (command === "agent" && argv[index + 1] === "catalog") {
+    return { configPath, command: { kind: "agent-catalog" } };
   }
   if (command === "people" && argv[index + 1] === "list") {
     return { configPath, command: { kind: "people-list" } };
@@ -523,6 +550,17 @@ function parseArgs(argv: string[]): ParsedArgs {
       }
     };
   }
+  if (command === "sync" && argv[index + 1] === "push") {
+    const args = argv.slice(index + 2);
+    return {
+      configPath,
+      command: {
+        kind: "sync-push",
+        provider: requireOptionValue(args, "--provider"),
+        reason: getOptionValue(args, "--reason")
+      }
+    };
+  }
   if (command === "sync" && argv[index + 1] === "retry") {
     const args = argv.slice(index + 2);
     return {
@@ -533,6 +571,57 @@ function parseArgs(argv: string[]): ParsedArgs {
         projectId: getOptionValue(args, "--project"),
         taskId: getOptionValue(args, "--task"),
         reason: getOptionValue(args, "--reason")
+      }
+    };
+  }
+  if (command === "session" && argv[index + 1] === "list") {
+    const args = argv.slice(index + 2);
+    return {
+      configPath,
+      command: {
+        kind: "session-list",
+        actorId: getOptionValue(args, "--actor"),
+        activeOnly: args.includes("--active-only")
+      }
+    };
+  }
+  if (command === "session" && argv[index + 1] === "create") {
+    const args = argv.slice(index + 2);
+    return {
+      configPath,
+      command: {
+        kind: "session-create",
+        actorId: requireOptionValue(args, "--actor"),
+        label: getOptionValue(args, "--label")
+      }
+    };
+  }
+  if (command === "session" && argv[index + 1] === "revoke") {
+    const args = argv.slice(index + 2);
+    return {
+      configPath,
+      command: {
+        kind: "session-revoke",
+        sessionId: requireOptionValue(args, "--session")
+      }
+    };
+  }
+  if (command === "connector" && argv[index + 1] === "ingest") {
+    const args = argv.slice(index + 2);
+    const provider = requireOptionValue(args, "--provider");
+    if (!["telegram", "discord", "slack"].includes(provider)) {
+      throw new Error("connector ingest --provider must be telegram, discord, or slack");
+    }
+    return {
+      configPath,
+      command: {
+        kind: "connector-ingest",
+        provider: provider as "telegram" | "discord" | "slack",
+        body: requireOptionValue(args, "--body"),
+        senderId: requireOptionValue(args, "--sender-id"),
+        senderName: getOptionValue(args, "--sender-name"),
+        threadId: getOptionValue(args, "--thread"),
+        title: getOptionValue(args, "--title")
       }
     };
   }
@@ -807,6 +896,17 @@ function runAgentList(root: string, configPath: string, projectId?: string): num
   const state = loadRuntimeState(config, root);
   listAgents(state, projectId).forEach((agent) => {
     console.log(`${agent.id}\t${agent.role}\t${agent.sourceKind ?? "-"}\t${agent.trustState}\tprojects=${agent.assignedProjects.join(",")}`);
+  });
+  return 0;
+}
+
+function runAgentCatalog(root: string, configPath: string): number {
+  const config = loadOrExit(configPath);
+  const state = loadRuntimeState(config, root);
+  listAgentCatalog(state, root).forEach((agent) => {
+    console.log(
+      `${agent.id}\t${agent.role}\t${agent.trustState}\t${agent.sourceKind ?? "-"}\t${agent.cachedPath ?? "-"}\tprojects=${agent.assignedProjects.join(",")}`
+    );
   });
   return 0;
 }
@@ -1273,6 +1373,22 @@ function runSyncList(
   return 0;
 }
 
+function runSyncPush(
+  root: string,
+  configPath: string,
+  command: Extract<Command, { kind: "sync-push" }>
+): number {
+  const config = loadOrExit(configPath);
+  const state = loadRuntimeState(config, root);
+  const record = pushRuntimeToProvider(config, root, state, {
+    provider: command.provider,
+    reason: command.reason
+  });
+  saveRuntimeState(config, root, state);
+  console.log(`${record.id}\t${record.provider}\t${record.status}\t${record.reason}`);
+  return 0;
+}
+
 function runSyncRetry(
   root: string,
   configPath: string,
@@ -1288,6 +1404,77 @@ function runSyncRetry(
   });
   saveRuntimeState(config, root, state);
   console.log(`${record.id}\t${record.provider}\t${record.status}\t${record.projectId ?? "-"}\t${record.taskId ?? "-"}`);
+  return 0;
+}
+
+function runSessionList(
+  root: string,
+  configPath: string,
+  command: Extract<Command, { kind: "session-list" }>
+): number {
+  const config = loadOrExit(configPath);
+  const state = loadRuntimeState(config, root);
+  listSessions(state, {
+    actorId: command.actorId,
+    activeOnly: command.activeOnly
+  }).forEach((session) => {
+    console.log(
+      `${session.id}\t${session.actorId}\t${session.role}\t${session.label ?? "-"}\tactive=${session.revokedAt === null}\t${session.lastSeenAt}`
+    );
+  });
+  return 0;
+}
+
+function runSessionCreate(
+  root: string,
+  configPath: string,
+  command: Extract<Command, { kind: "session-create" }>
+): number {
+  const config = loadOrExit(configPath);
+  const state = loadRuntimeState(config, root);
+  const session = createSession(config, state, {
+    actorId: command.actorId,
+    label: command.label
+  });
+  saveRuntimeState(config, root, state);
+  console.log(`${session.id}\t${session.actorId}\t${session.role}\t${session.token}`);
+  return 0;
+}
+
+function runSessionRevoke(
+  root: string,
+  configPath: string,
+  command: Extract<Command, { kind: "session-revoke" }>
+): number {
+  const config = loadOrExit(configPath);
+  const state = loadRuntimeState(config, root);
+  const session = revokeSession(state, {
+    sessionId: command.sessionId
+  });
+  saveRuntimeState(config, root, state);
+  console.log(`${session.id}\trevoked=${session.revokedAt ?? "-"}`);
+  return 0;
+}
+
+function runConnectorIngest(
+  root: string,
+  configPath: string,
+  command: Extract<Command, { kind: "connector-ingest" }>
+): number {
+  const config = loadOrExit(configPath);
+  const state = loadRuntimeState(config, root);
+  const result = ingestConnectorMessage(config, root, state, {
+    provider: command.provider,
+    body: command.body,
+    senderId: command.senderId,
+    senderName: command.senderName,
+    threadId: command.threadId,
+    title: command.title
+  });
+  saveRuntimeState(config, root, state);
+  console.log(
+    `${result.provider}\t${result.mode}\tthread=${result.threadId}\ttask=${result.taskId ?? "-"}\tmessage=${result.messageId}`
+  );
   return 0;
 }
 
@@ -1386,6 +1573,7 @@ function helpText(): string {
     "  comphony [--config company.yaml] project overview",
     "  comphony [--config company.yaml] project create --id <project-id> --name <name> --lanes <comma-separated> [--purpose <text>] [--repo-slug <slug>]",
     "  comphony [--config company.yaml] agent list [--project <project-id>]",
+    "  comphony [--config company.yaml] agent catalog",
     "  comphony [--config company.yaml] people list",
     "  comphony [--config company.yaml] agent install --source-kind local_package|registry_package --ref <path> [--trust trusted|restricted|quarantined]",
     "  comphony [--config company.yaml] agent assign-project --agent <agent-id> --project <project-id>",
@@ -1408,7 +1596,12 @@ function helpText(): string {
     "  comphony [--config company.yaml] approval request --action <action> --reason <text> [--task <task-id>] [--actor <actor-id>]",
     "  comphony [--config company.yaml] approval decide --approval <approval-id> --decision granted|denied [--actor <actor-id>] [--notes <text>]",
     "  comphony [--config company.yaml] sync list [--provider <provider>] [--project <project-id>] [--status <status>]",
+    "  comphony [--config company.yaml] sync push --provider <provider> [--reason <text>]",
     "  comphony [--config company.yaml] sync retry --provider <provider> [--project <project-id>] [--task <task-id>] [--reason <text>]",
+    "  comphony [--config company.yaml] session list [--actor <actor-id>] [--active-only]",
+    "  comphony [--config company.yaml] session create --actor <actor-id> [--label <text>]",
+    "  comphony [--config company.yaml] session revoke --session <session-id>",
+    "  comphony [--config company.yaml] connector ingest --provider telegram|discord|slack --sender-id <id> --body <text> [--sender-name <name>] [--thread <thread-id>] [--title <text>]",
     "  comphony [--config company.yaml] thread create --title <title>",
     "  comphony [--config company.yaml] thread list",
     "  comphony [--config company.yaml] thread show --thread <thread-id>",
