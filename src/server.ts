@@ -4,19 +4,39 @@ import type { JSONObject } from "./config.js";
 import { resolveRoutingPolicy, summarizeCompanyConfig } from "./config.js";
 import {
   addMessage,
+  assignAgentToProject,
   assignTask,
   autoAssignTask,
+  completeTaskReview,
+  continueThread,
+  createProject,
   createThread,
+  decideApproval,
   getThreadDetail,
   handoffTask,
   intakeRequest,
+  installAgentPackage,
+  listApprovals,
+  listConsultations,
   listEvents,
+  listPeopleOverview,
   listMemories,
+  listProjectOverview,
+  listReviews,
+  listSyncRecords,
+  recommendMemories,
+  recommendTasks,
   listMessages,
   listThreads,
   loadRuntimeState,
   promoteMessageToTask,
   respondToThread,
+  requestApproval,
+  requestConsultation,
+  requestTaskReview,
+  retrySync,
+  syncTaskToProvider,
+  resolveConsultation,
   runTaskWorkTurn,
   saveRuntimeState,
   updateTaskStatus
@@ -37,7 +57,9 @@ export function startServer(config: JSONObject, root: string): void {
 
   server.listen(port, host, () => {
     console.log(`Comphony server listening on http://${host}:${port}`);
-    console.log("Available endpoints: /healthz, /v1/status, /v1/projects, /v1/agents, /v1/tasks, /v1/threads, /v1/messages, /v1/events");
+    console.log(
+      "Available endpoints: /healthz, /v1/status, /v1/projects, /v1/projects/overview, /v1/agents, /v1/people, /v1/tasks, /v1/tasks/recommend, /v1/tasks/sync, /v1/threads, /v1/messages, /v1/events, /v1/memory, /v1/consultations, /v1/reviews, /v1/approvals, /v1/sync"
+    );
   });
 }
 
@@ -68,12 +90,42 @@ function handleRequest(
     writeJson(response, 200, { projects: state.projects });
     return;
   }
+  if (request.method === "GET" && parsedUrl.pathname === "/v1/projects/overview") {
+    writeJson(response, 200, { projects: listProjectOverview(state) });
+    return;
+  }
+  if (request.method === "GET" && parsedUrl.pathname === "/v1/sync") {
+    writeJson(response, 200, {
+      sync: listSyncRecords(state, {
+        provider: parsedUrl.searchParams.get("provider") ?? undefined,
+        projectId: parsedUrl.searchParams.get("projectId") ?? undefined,
+        status: parsedUrl.searchParams.get("status") ?? undefined
+      })
+    });
+    return;
+  }
   if (request.method === "GET" && url === "/v1/agents") {
     writeJson(response, 200, { agents: state.agents });
     return;
   }
+  if (request.method === "GET" && parsedUrl.pathname === "/v1/people") {
+    writeJson(response, 200, { people: listPeopleOverview(state) });
+    return;
+  }
   if (request.method === "GET" && url === "/v1/tasks") {
     writeJson(response, 200, { tasks: state.tasks });
+    return;
+  }
+  if (request.method === "GET" && parsedUrl.pathname === "/v1/tasks/recommend") {
+    writeJson(response, 200, {
+      tasks: recommendTasks(state, {
+        projectId: parsedUrl.searchParams.get("projectId") ?? undefined,
+        threadId: parsedUrl.searchParams.get("threadId") ?? undefined,
+        taskId: parsedUrl.searchParams.get("taskId") ?? undefined,
+        query: parsedUrl.searchParams.get("query") ?? undefined,
+        limit: parsedUrl.searchParams.get("limit") ? Number(parsedUrl.searchParams.get("limit")) : undefined
+      })
+    });
     return;
   }
   if (request.method === "GET" && parsedUrl.pathname === "/v1/events/stream") {
@@ -94,6 +146,48 @@ function handleRequest(
         taskId: parsedUrl.searchParams.get("taskId") ?? undefined,
         query: parsedUrl.searchParams.get("query") ?? undefined,
         limit: parsedUrl.searchParams.get("limit") ? Number(parsedUrl.searchParams.get("limit")) : undefined
+      })
+    });
+    return;
+  }
+  if (request.method === "GET" && parsedUrl.pathname === "/v1/memory/recommend") {
+    writeJson(response, 200, {
+      memories: recommendMemories(state, {
+        projectId: parsedUrl.searchParams.get("projectId") ?? undefined,
+        threadId: parsedUrl.searchParams.get("threadId") ?? undefined,
+        taskId: parsedUrl.searchParams.get("taskId") ?? undefined,
+        query: parsedUrl.searchParams.get("query") ?? undefined,
+        limit: parsedUrl.searchParams.get("limit") ? Number(parsedUrl.searchParams.get("limit")) : undefined
+      })
+    });
+    return;
+  }
+  if (request.method === "GET" && parsedUrl.pathname === "/v1/consultations") {
+    writeJson(response, 200, {
+      consultations: listConsultations(state, {
+        taskId: parsedUrl.searchParams.get("taskId") ?? undefined,
+        threadId: parsedUrl.searchParams.get("threadId") ?? undefined,
+        status: parsedUrl.searchParams.get("status") ?? undefined
+      })
+    });
+    return;
+  }
+  if (request.method === "GET" && parsedUrl.pathname === "/v1/reviews") {
+    writeJson(response, 200, {
+      reviews: listReviews(state, {
+        taskId: parsedUrl.searchParams.get("taskId") ?? undefined,
+        threadId: parsedUrl.searchParams.get("threadId") ?? undefined,
+        status: parsedUrl.searchParams.get("status") ?? undefined
+      })
+    });
+    return;
+  }
+  if (request.method === "GET" && parsedUrl.pathname === "/v1/approvals") {
+    writeJson(response, 200, {
+      approvals: listApprovals(state, {
+        taskId: parsedUrl.searchParams.get("taskId") ?? undefined,
+        threadId: parsedUrl.searchParams.get("threadId") ?? undefined,
+        status: parsedUrl.searchParams.get("status") ?? undefined
       })
     });
     return;
@@ -122,6 +216,7 @@ function handleRequest(
   }
   if (request.method === "POST" && url === "/v1/intake") {
     void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "operator");
       const before = state.events.length;
       const title = stringField(payload, "title");
       const body = stringField(payload, "body");
@@ -136,6 +231,7 @@ function handleRequest(
   }
   if (request.method === "POST" && url === "/v1/threads") {
     void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "operator");
       const before = state.events.length;
       const title = stringField(payload, "title");
       const thread = createThread(state, { title });
@@ -147,6 +243,7 @@ function handleRequest(
   }
   if (request.method === "POST" && url === "/v1/threads/respond") {
     void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "operator");
       const before = state.events.length;
       const result = respondToThread(config, state, {
         threadId: stringField(payload, "threadId"),
@@ -158,8 +255,22 @@ function handleRequest(
     });
     return;
   }
+  if (request.method === "POST" && url === "/v1/threads/continue") {
+    void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "operator");
+      const before = state.events.length;
+      const result = continueThread(config, root, state, {
+        threadId: stringField(payload, "threadId")
+      });
+      saveRuntimeState(config, root, state);
+      broadcastEvents(eventClients, state.events.slice(before));
+      writeJson(response, 201, result);
+    });
+    return;
+  }
   if (request.method === "POST" && url === "/v1/messages") {
     void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "operator");
       const before = state.events.length;
       const threadId = stringField(payload, "threadId");
       const body = stringField(payload, "body");
@@ -181,6 +292,7 @@ function handleRequest(
   }
   if (request.method === "POST" && url === "/v1/messages/promote") {
     void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "operator");
       const before = state.events.length;
       const routing = resolveRoutingPolicy(config);
       const task = promoteMessageToTask(state, {
@@ -197,6 +309,7 @@ function handleRequest(
   }
   if (request.method === "POST" && url === "/v1/tasks/assign") {
     void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "operator");
       const before = state.events.length;
       const taskId = stringField(payload, "taskId");
       const agentId = optionalStringField(payload, "agentId");
@@ -211,6 +324,7 @@ function handleRequest(
   }
   if (request.method === "POST" && url === "/v1/tasks/status") {
     void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "operator");
       const before = state.events.length;
       const task = updateTaskStatus(state, {
         taskId: stringField(payload, "taskId"),
@@ -224,6 +338,7 @@ function handleRequest(
   }
   if (request.method === "POST" && url === "/v1/tasks/work") {
     void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "operator");
       const before = state.events.length;
       const result = runTaskWorkTurn(config, root, state, {
         taskId: stringField(payload, "taskId")
@@ -236,6 +351,7 @@ function handleRequest(
   }
   if (request.method === "POST" && url === "/v1/tasks/handoff") {
     void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "operator");
       const before = state.events.length;
       const result = handoffTask(config, root, state, {
         taskId: stringField(payload, "taskId"),
@@ -244,6 +360,187 @@ function handleRequest(
       saveRuntimeState(config, root, state);
       broadcastEvents(eventClients, state.events.slice(before));
       writeJson(response, 201, result);
+    });
+    return;
+  }
+  if (request.method === "POST" && url === "/v1/tasks/sync") {
+    void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "admin");
+      const before = state.events.length;
+      const result = syncTaskToProvider(config, root, state, {
+        provider: stringField(payload, "provider"),
+        taskId: stringField(payload, "taskId")
+      });
+      saveRuntimeState(config, root, state);
+      broadcastEvents(eventClients, state.events.slice(before));
+      writeJson(response, 201, result);
+    });
+    return;
+  }
+  if (request.method === "POST" && url === "/v1/tasks/consult") {
+    void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "operator");
+      const before = state.events.length;
+      const result = requestConsultation(config, state, {
+        taskId: stringField(payload, "taskId"),
+        toAgentId: stringField(payload, "toAgentId"),
+        reason: stringField(payload, "reason"),
+        instructions: optionalStringField(payload, "instructions")
+      });
+      saveRuntimeState(config, root, state);
+      broadcastEvents(eventClients, state.events.slice(before));
+      writeJson(response, 201, result);
+    });
+    return;
+  }
+  if (request.method === "POST" && url === "/v1/consultations/resolve") {
+    void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "operator");
+      const before = state.events.length;
+      const result = resolveConsultation(config, state, {
+        consultationId: stringField(payload, "consultationId"),
+        response: stringField(payload, "response")
+      });
+      saveRuntimeState(config, root, state);
+      broadcastEvents(eventClients, state.events.slice(before));
+      writeJson(response, 201, result);
+    });
+    return;
+  }
+  if (request.method === "POST" && url === "/v1/tasks/review") {
+    void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "reviewer");
+      const before = state.events.length;
+      const result = requestTaskReview(config, state, {
+        taskId: stringField(payload, "taskId"),
+        reviewerAgentId: stringField(payload, "reviewerAgentId"),
+        reason: stringField(payload, "reason")
+      });
+      saveRuntimeState(config, root, state);
+      broadcastEvents(eventClients, state.events.slice(before));
+      writeJson(response, 201, result);
+    });
+    return;
+  }
+  if (request.method === "POST" && url === "/v1/reviews/complete") {
+    void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "reviewer");
+      const before = state.events.length;
+      const outcome = stringField(payload, "outcome");
+      if (!["approved", "changes_requested"].includes(outcome)) {
+        throw new Error("outcome must be approved or changes_requested");
+      }
+      const result = completeTaskReview(config, state, {
+        reviewId: stringField(payload, "reviewId"),
+        outcome: outcome as "approved" | "changes_requested",
+        notes: optionalStringField(payload, "notes")
+      });
+      saveRuntimeState(config, root, state);
+      broadcastEvents(eventClients, state.events.slice(before));
+      writeJson(response, 201, result);
+    });
+    return;
+  }
+  if (request.method === "POST" && url === "/v1/approvals/request") {
+    void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "operator");
+      const before = state.events.length;
+      const result = requestApproval(config, state, {
+        action: stringField(payload, "action"),
+        reason: stringField(payload, "reason"),
+        taskId: optionalStringField(payload, "taskId"),
+        requestedBy: optionalStringField(payload, "requestedBy")
+      });
+      saveRuntimeState(config, root, state);
+      broadcastEvents(eventClients, state.events.slice(before));
+      writeJson(response, 201, result);
+    });
+    return;
+  }
+  if (request.method === "POST" && url === "/v1/approvals/decide") {
+    void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "admin");
+      const before = state.events.length;
+      const decision = stringField(payload, "decision");
+      if (!["granted", "denied"].includes(decision)) {
+        throw new Error("decision must be granted or denied");
+      }
+      const result = decideApproval(config, state, {
+        approvalId: stringField(payload, "approvalId"),
+        decision: decision as "granted" | "denied",
+        actorId: optionalStringField(payload, "actorId"),
+        notes: optionalStringField(payload, "notes")
+      });
+      saveRuntimeState(config, root, state);
+      broadcastEvents(eventClients, state.events.slice(before));
+      writeJson(response, 201, result);
+    });
+    return;
+  }
+  if (request.method === "POST" && url === "/v1/projects") {
+    void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "admin");
+      const before = state.events.length;
+      const lanes = arrayOfStringsField(payload, "lanes");
+      const project = createProject(state, {
+        id: stringField(payload, "id"),
+        name: stringField(payload, "name"),
+        purpose: optionalStringField(payload, "purpose"),
+        lanes,
+        repoSlug: optionalStringField(payload, "repoSlug")
+      });
+      saveRuntimeState(config, root, state);
+      broadcastEvents(eventClients, state.events.slice(before));
+      writeJson(response, 201, { project });
+    });
+    return;
+  }
+  if (request.method === "POST" && url === "/v1/agents/install") {
+    void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "admin");
+      const before = state.events.length;
+      const sourceKind = stringField(payload, "sourceKind");
+      if (!["local_package", "registry_package"].includes(sourceKind)) {
+        throw new Error("sourceKind must be local_package or registry_package");
+      }
+      const agent = installAgentPackage(state, root, {
+        sourceKind: sourceKind as "local_package" | "registry_package",
+        ref: stringField(payload, "ref"),
+        trustState: optionalStringField(payload, "trustState") as "trusted" | "restricted" | "quarantined" | undefined
+      });
+      saveRuntimeState(config, root, state);
+      broadcastEvents(eventClients, state.events.slice(before));
+      writeJson(response, 201, { agent });
+    });
+    return;
+  }
+  if (request.method === "POST" && url === "/v1/agents/assign-project") {
+    void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "admin");
+      const before = state.events.length;
+      const agent = assignAgentToProject(state, {
+        agentId: stringField(payload, "agentId"),
+        projectId: stringField(payload, "projectId")
+      });
+      saveRuntimeState(config, root, state);
+      broadcastEvents(eventClients, state.events.slice(before));
+      writeJson(response, 201, { agent });
+    });
+    return;
+  }
+  if (request.method === "POST" && url === "/v1/sync/retry") {
+    void handlePostJson(request, response, async (payload) => {
+      requireActorForMutation(request, config, "admin");
+      const before = state.events.length;
+      const record = retrySync(config, root, state, {
+        provider: stringField(payload, "provider"),
+        projectId: optionalStringField(payload, "projectId"),
+        taskId: optionalStringField(payload, "taskId"),
+        reason: optionalStringField(payload, "reason")
+      });
+      saveRuntimeState(config, root, state);
+      broadcastEvents(eventClients, state.events.slice(before));
+      writeJson(response, 201, { sync: record });
     });
     return;
   }
@@ -302,6 +599,58 @@ function optionalStringField(payload: Record<string, unknown>, key: string): str
     throw new Error(`${key} must be a string when provided`);
   }
   return value;
+}
+
+function arrayOfStringsField(payload: Record<string, unknown>, key: string): string[] {
+  const value = payload[key];
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) {
+    throw new Error(`${key} must be an array of strings`);
+  }
+  return value;
+}
+
+function requireActorForMutation(
+  request: IncomingMessage,
+  config: JSONObject,
+  minimumRole: "operator" | "reviewer" | "admin"
+): void {
+  const auth = asMap(config.auth);
+  if (auth?.require_auth_for_remote_clients !== true) {
+    return;
+  }
+  const rawActor = request.headers["x-comphony-actor-id"];
+  const actorId = Array.isArray(rawActor) ? rawActor[0] : rawActor;
+  if (typeof actorId !== "string" || actorId.trim() === "") {
+    throw new Error("Missing x-comphony-actor-id header");
+  }
+  const localUsers = Array.isArray(auth?.local_users) ? auth.local_users : [];
+  const actor = localUsers.find((entry) => asMap(entry)?.id === actorId);
+  if (!actor) {
+    throw new Error(`Unknown actor id: ${actorId}`);
+  }
+  const role = String(asMap(actor)?.role ?? "observer");
+  if (roleRank(role) < roleRank(minimumRole)) {
+    throw new Error(`Actor ${actorId} does not have permission for this action`);
+  }
+}
+
+function roleRank(role: string): number {
+  switch (role) {
+    case "owner":
+      return 4;
+    case "admin":
+      return 3;
+    case "operator":
+      return 2;
+    case "reviewer":
+      return 2;
+    default:
+      return 0;
+  }
+}
+
+function asMap(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
 function writeJson(response: ServerResponse, statusCode: number, payload: unknown): void {

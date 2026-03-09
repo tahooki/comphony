@@ -177,7 +177,7 @@ The repo now includes the first real local runtime slice:
 - [tsconfig.json](/Users/tahooki/Documents/comphony/tsconfig.json)
   - TypeScript compiler configuration
 - [src/cli.ts](/Users/tahooki/Documents/comphony/src/cli.ts)
-  - `init`, `validate`, `project list`, `agent list`, `task create`, `task list`, `task assign`, `task autoassign`, `task status`, `task work`, `thread show`, and `server start`
+  - `init`, `validate`, `project list/overview/create`, `agent list/install/assign-project`, `people list`, `task create/list/assign/autoassign/status/work/recommend/sync`, `consult`, `review`, `approval`, `sync list/retry`, `thread show/continue/ask`, and `server start`
 - [src/server.ts](/Users/tahooki/Documents/comphony/src/server.ts)
   - minimal HTTP runtime
 - [src/state.ts](/Users/tahooki/Documents/comphony/src/state.ts)
@@ -205,6 +205,18 @@ npm run comphony -- task list --project product_core
 npm run comphony -- task autoassign --task task_0001
 npm run comphony -- task status --task task_0001 --status in_progress
 npm run comphony -- task work --task task_0001
+npm run comphony -- task recommend --project product_core --query "dashboard ui ux"
+npm run comphony -- project overview
+npm run comphony -- people list
+npm run comphony -- project create --id research_lab --name "Research Lab" --lanes planning,research --repo-slug research-lab
+npm run comphony -- agent install --source-kind local_package --ref ./agents/design_planner_01
+npm run comphony -- agent install --source-kind registry_package --ref https://registry.example.com/agents/remote-designer
+npm run comphony -- agent assign-project --agent design_planner_01 --project product_core
+npm run comphony -- consult request --task task_0001 --agent desk_coordinator --reason "Need clarification"
+npm run comphony -- review request --task task_0001 --reviewer frontend_publisher_01 --reason "Ready for review"
+npm run comphony -- approval request --task task_0001 --action external_sync --reason "Needs explicit approval"
+npm run comphony -- task sync --task task_0001 --provider linear
+npm run comphony -- sync list
 ```
 
 Conversation workflow example:
@@ -215,8 +227,10 @@ npm run comphony -- message send --thread thread_0001 --body "Please design a cl
 npm run comphony -- message list --thread thread_0001
 npm run comphony -- message promote --message msg_0001
 npm run comphony -- thread show --thread thread_0001
+npm run comphony -- thread continue --thread thread_0001
 npm run comphony -- thread ask --thread thread_0001 --body "What is the current status?"
 npm run comphony -- memory list --thread thread_0001
+npm run comphony -- memory recommend --thread thread_0001 --query "current status"
 ```
 
 One-shot intake example:
@@ -232,10 +246,19 @@ Browser workflow example:
 - open [http://127.0.0.1:43110/](http://127.0.0.1:43110/)
 - submit an intake request
 - select a thread from the left column
-- send a follow-up question in the selected thread
-- assign the linked task, run a work turn, or move it to `in_progress`, `review`, or `done`
+- continue the selected thread from chat without manually stepping each workflow transition
+- send a follow-up question in the selected thread, including `@agent` messages
+- inspect the task graph, people, projects, and memory views
+- use Advanced Mode only when you want to intervene directly in low-level operations
+- use Advanced Mode to mirror a task out to Linear with `Sync Linear`
 - watch the event stream refresh automatically
-- inspect recent memory captured for the selected thread
+- inspect related memory ranked for the selected thread and question
+- inspect similar tasks ranked for the selected thread and follow-up
+
+HTTP auth note:
+
+- when `auth.require_auth_for_remote_clients` is enabled, mutation endpoints require `X-Comphony-Actor-Id`
+- the bundled web UI sends `owner_01` by default for local use
 
 Build handoff rule:
 
@@ -252,12 +275,20 @@ Work turn behavior:
 - the generated artifact paths are attached to the task record and echoed back into the thread
 - `task handoff` and `POST /v1/tasks/handoff` move work into the next lane and auto-assign the next eligible agent
 
+External sync rule:
+
+- when `policies.external_sync_requires_auth` is `true`, `task sync` and `POST /v1/tasks/sync` require a granted approval for the `external_sync` action on that task
+- the default CLI and web flow is: request approval -> grant approval -> sync to Linear
+
 Available server endpoints:
 
 - `GET /healthz`
 - `GET /v1/status`
+- `GET /v1/tasks/recommend`
 - `GET /v1/projects`
+- `GET /v1/projects/overview`
 - `GET /v1/agents`
+- `GET /v1/people`
 - `GET /v1/tasks`
 - `GET /v1/threads`
 - `GET /v1/threads/:threadId`
@@ -265,8 +296,14 @@ Available server endpoints:
 - `GET /v1/events?limit=20`
 - `GET /v1/events/stream`
 - `GET /v1/memory`
+- `GET /v1/memory/recommend`
+- `GET /v1/consultations`
+- `GET /v1/reviews`
+- `GET /v1/approvals`
+- `GET /v1/sync`
 - `POST /v1/intake`
 - `POST /v1/threads`
+- `POST /v1/threads/continue`
 - `POST /v1/threads/respond`
 - `POST /v1/messages`
 - `POST /v1/messages/promote`
@@ -274,6 +311,17 @@ Available server endpoints:
 - `POST /v1/tasks/handoff`
 - `POST /v1/tasks/work`
 - `POST /v1/tasks/status`
+- `POST /v1/tasks/sync`
+- `POST /v1/tasks/consult`
+- `POST /v1/consultations/resolve`
+- `POST /v1/tasks/review`
+- `POST /v1/reviews/complete`
+- `POST /v1/approvals/request`
+- `POST /v1/approvals/decide`
+- `POST /v1/projects`
+- `POST /v1/agents/install`
+- `POST /v1/agents/assign-project`
+- `POST /v1/sync/retry`
 
 ## Start Here
 

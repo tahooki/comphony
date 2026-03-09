@@ -4,48 +4,44 @@ export function renderWebAppHtml(): string {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Comphony Chat</title>
+    <title>Comphony</title>
     <style>
       :root {
         color-scheme: light;
-        --bg: #f3efe5;
-        --panel: rgba(255, 252, 246, 0.88);
+        --bg: #f4efe3;
+        --panel: rgba(255, 251, 244, 0.92);
         --line: rgba(24, 32, 41, 0.12);
-        --line-strong: rgba(24, 32, 41, 0.22);
         --text: #17202a;
-        --muted: #5f6b76;
+        --muted: #5d6872;
         --accent: #14532d;
-        --accent-soft: #d9f99d;
-        --signal: #1d4ed8;
-        --warning: #92400e;
+        --accent-2: #1d4ed8;
+        --chip: rgba(20, 83, 45, 0.09);
+        --danger: #9a3412;
         --radius: 18px;
-        --shadow: 0 18px 40px rgba(16, 24, 40, 0.08);
+        --shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
       }
 
       * { box-sizing: border-box; }
+
       body {
         margin: 0;
-        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+        font-family: "Iowan Old Style", "Palatino Linotype", serif;
         color: var(--text);
         background:
-          radial-gradient(circle at top left, rgba(217, 249, 157, 0.55), transparent 28%),
-          radial-gradient(circle at top right, rgba(147, 197, 253, 0.4), transparent 26%),
-          linear-gradient(180deg, #f7f4ec 0%, #efe6d6 100%);
+          radial-gradient(circle at top left, rgba(190, 242, 100, 0.4), transparent 30%),
+          radial-gradient(circle at top right, rgba(147, 197, 253, 0.3), transparent 24%),
+          linear-gradient(180deg, #f8f4ec 0%, #ece2d0 100%);
       }
+
+      button, input, textarea { font: inherit; }
 
       .shell {
-        max-width: 1440px;
+        max-width: 1500px;
         margin: 0 auto;
-        padding: 32px 20px 40px;
+        padding: 28px 18px 40px;
       }
 
-      .hero {
-        display: grid;
-        grid-template-columns: 1.4fr 0.9fr;
-        gap: 18px;
-        margin-bottom: 20px;
-      }
-
+      .hero,
       .card {
         background: var(--panel);
         border: 1px solid var(--line);
@@ -54,30 +50,34 @@ export function renderWebAppHtml(): string {
         backdrop-filter: blur(10px);
       }
 
-      .hero-main {
-        padding: 26px 28px;
+      .hero {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 18px;
+        padding: 24px 26px;
+        margin-bottom: 18px;
       }
 
-      .hero-main h1 {
-        margin: 0 0 8px;
+      .hero h1 {
+        margin: 0 0 10px;
         font-size: 40px;
         line-height: 1;
       }
 
-      .hero-main p {
+      .hero p {
         margin: 0;
         color: var(--muted);
-        max-width: 50rem;
+        max-width: 52rem;
       }
 
-      .hero-stats {
+      .hero-side {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
+        gap: 10px;
       }
 
-      .stat {
-        padding: 18px;
+      .stat-card {
+        padding: 14px 16px;
       }
 
       .stat-label {
@@ -86,46 +86,97 @@ export function renderWebAppHtml(): string {
         color: var(--muted);
         text-transform: uppercase;
         letter-spacing: 0.08em;
-        margin-bottom: 8px;
       }
 
       .stat-value {
+        display: block;
+        margin-top: 8px;
         font-size: 28px;
         font-weight: 700;
       }
 
-      .grid {
+      .layout {
         display: grid;
-        grid-template-columns: 0.9fr 1.2fr 0.8fr;
+        grid-template-columns: 320px minmax(0, 1fr);
         gap: 18px;
       }
 
-      .panel {
-        padding: 20px;
+      .sidebar,
+      .main {
+        min-width: 0;
+      }
+
+      .card {
+        padding: 18px;
       }
 
       .section-head {
         display: flex;
-        justify-content: space-between;
-        gap: 12px;
         align-items: center;
+        justify-content: space-between;
+        gap: 10px;
         margin-bottom: 12px;
       }
 
-      .section-head h2, .section-head h3 {
+      .section-head h2,
+      .section-head h3 {
         margin: 0;
       }
 
+      .status-pill,
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: var(--chip);
+        color: var(--accent);
+        font-size: 13px;
+      }
+
+      .chip.is-danger {
+        background: rgba(154, 52, 18, 0.1);
+        color: var(--danger);
+      }
+
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .tab {
+        border: 0;
+        border-radius: 999px;
+        padding: 10px 14px;
+        background: rgba(15, 23, 42, 0.08);
+        color: var(--text);
+        cursor: pointer;
+      }
+
+      .tab.active {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: white;
+      }
+
+      .view {
+        display: none;
+      }
+
+      .view.active {
+        display: block;
+      }
+
       .thread-list,
-      .message-list,
-      .task-list,
-      .event-list {
+      .stack {
         display: grid;
         gap: 10px;
       }
 
       .thread-list {
-        max-height: 620px;
+        max-height: 480px;
         overflow: auto;
         padding-right: 4px;
       }
@@ -133,41 +184,31 @@ export function renderWebAppHtml(): string {
       .thread-card,
       .message-card,
       .task-card,
-      .event-card {
+      .info-card {
+        background: rgba(255, 255, 255, 0.74);
         border: 1px solid var(--line);
         border-radius: 16px;
         padding: 14px 16px;
-        background: rgba(255, 255, 255, 0.72);
       }
 
       .thread-card {
         cursor: pointer;
-        transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
       }
 
-      .thread-card:hover,
       .thread-card.selected {
-        transform: translateY(-1px);
-        border-color: var(--line-strong);
-        box-shadow: 0 12px 26px rgba(16, 24, 40, 0.08);
+        border-color: rgba(29, 78, 216, 0.4);
+        box-shadow: 0 10px 26px rgba(29, 78, 216, 0.12);
       }
 
-      .message-card header,
       .thread-card header,
+      .message-card header,
       .task-card header,
-      .event-card header {
+      .info-card header {
         display: flex;
+        align-items: flex-start;
         justify-content: space-between;
         gap: 12px;
-        align-items: flex-start;
         margin-bottom: 6px;
-      }
-
-      .message-card header strong,
-      .thread-card header strong,
-      .task-card header strong,
-      .event-card header strong {
-        display: block;
       }
 
       .meta {
@@ -175,52 +216,28 @@ export function renderWebAppHtml(): string {
         font-size: 13px;
       }
 
-      .detail-grid {
-        display: grid;
-        gap: 16px;
-      }
-
       .composer {
         display: grid;
         gap: 10px;
-        margin-top: 16px;
-      }
-
-      input, textarea, button {
-        font: inherit;
       }
 
       input, textarea {
         width: 100%;
         border-radius: 14px;
         border: 1px solid var(--line);
-        padding: 12px 14px;
         background: rgba(255, 255, 255, 0.88);
+        padding: 12px 14px;
       }
 
       textarea {
-        min-height: 120px;
+        min-height: 112px;
         resize: vertical;
       }
 
-      .composer-actions,
-      .task-actions {
+      .actions {
         display: flex;
         flex-wrap: wrap;
-        justify-content: space-between;
-        align-items: center;
         gap: 8px;
-      }
-
-      .status-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        border-radius: 999px;
-        padding: 8px 12px;
-        background: rgba(20, 83, 45, 0.08);
-        color: var(--accent);
-        font-size: 13px;
       }
 
       button {
@@ -228,46 +245,72 @@ export function renderWebAppHtml(): string {
         border: 0;
         border-radius: 999px;
         padding: 10px 14px;
-        background: linear-gradient(135deg, #14532d, #1d4ed8);
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
         color: white;
-        box-shadow: var(--shadow);
       }
 
       button.secondary {
-        background: rgba(20, 32, 42, 0.08);
+        background: rgba(15, 23, 42, 0.08);
         color: var(--text);
-        box-shadow: none;
       }
 
-      .task-actions button {
-        padding: 8px 12px;
+      .task-card.is-child {
+        margin-left: 20px;
+      }
+
+      .task-card.is-parent {
+        border-style: dashed;
+      }
+
+      .two-col {
+        display: grid;
+        grid-template-columns: 1.3fr 0.8fr;
+        gap: 16px;
+      }
+
+      .three-col {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .toggle input {
+        width: auto;
       }
 
       .empty {
-        border: 1px dashed var(--line-strong);
+        border: 1px dashed rgba(15, 23, 42, 0.2);
         border-radius: 16px;
         padding: 18px;
         color: var(--muted);
-        background: rgba(255, 255, 255, 0.5);
       }
 
-      code {
-        color: var(--signal);
+      .advanced-only {
+        display: none;
+      }
+
+      body.advanced .advanced-only {
+        display: flex;
+      }
+
+      body.advanced .advanced-only.block {
+        display: block;
       }
 
       @media (max-width: 1200px) {
-        .grid {
+        .layout,
+        .hero,
+        .two-col,
+        .three-col {
           grid-template-columns: 1fr;
-        }
-      }
-
-      @media (max-width: 960px) {
-        .hero {
-          grid-template-columns: 1fr;
-        }
-
-        .hero-main h1 {
-          font-size: 32px;
         }
       }
     </style>
@@ -275,91 +318,172 @@ export function renderWebAppHtml(): string {
   <body>
     <main class="shell">
       <section class="hero">
-        <div class="card hero-main">
-          <h1>Comphony Chat</h1>
-          <p>Talk to Comphony, create intake requests, inspect thread context, and move tasks through assignment and status updates without leaving the conversation surface.</p>
+        <div>
+          <h1>Comphony</h1>
+          <p>Tell Comphony what outcome you want. Comphony can decompose work, route it to agents, coordinate reviews and consultations, and report back without forcing you to operate the workflow by hand.</p>
         </div>
-        <div class="hero-stats">
-          <div class="card stat">
+        <div class="hero-side">
+          <div class="card stat-card">
             <span class="stat-label">Projects</span>
             <span class="stat-value" id="stat-projects">-</span>
           </div>
-          <div class="card stat">
+          <div class="card stat-card">
             <span class="stat-label">Agents</span>
             <span class="stat-value" id="stat-agents">-</span>
           </div>
-          <div class="card stat">
+          <div class="card stat-card">
             <span class="stat-label">Tasks</span>
             <span class="stat-value" id="stat-tasks">-</span>
           </div>
-          <div class="card stat">
+          <div class="card stat-card">
             <span class="stat-label">Events</span>
             <span class="stat-value" id="stat-events">-</span>
           </div>
         </div>
       </section>
 
-      <section class="grid">
-        <section class="card panel">
-          <div class="section-head">
-            <h2>Threads</h2>
-            <span class="status-pill" id="connection-status">Connecting...</span>
-          </div>
-          <div class="thread-list" id="thread-list"></div>
-        </section>
-
-        <section class="card panel">
-          <div class="section-head">
-            <h2>Selected Thread</h2>
-            <button class="secondary" type="button" id="refresh-detail">Refresh</button>
-          </div>
-          <div class="detail-grid">
-            <div id="thread-detail"></div>
+      <section class="layout">
+        <aside class="sidebar stack">
+          <section class="card">
+            <div class="section-head">
+              <h2>Company Inbox</h2>
+              <span class="status-pill" id="connection-status">Connecting...</span>
+            </div>
             <form class="composer" id="intake-form">
               <input id="intake-title" placeholder="Request title" value="Refresh Product - Core dashboard" />
-              <textarea id="intake-body" placeholder="Tell Comphony what you want done.">Please redesign the Product - Core dashboard UI and improve the UX.</textarea>
-              <div class="composer-actions">
-                <div class="status-pill">Intake creates thread, message, task, and auto-assignment.</div>
+              <textarea id="intake-body" placeholder="Tell Comphony what you want.">Please redesign the Product - Core dashboard UI, improve the UX, and prepare it for implementation.</textarea>
+              <div class="actions">
                 <button type="submit">Send To Comphony</button>
               </div>
             </form>
-          </div>
-        </section>
+          </section>
 
-        <aside class="card panel">
-          <div class="section-head">
-            <h2>Recent Events</h2>
-            <button class="secondary" type="button" id="refresh-events">Reload</button>
-          </div>
-          <div class="event-list" id="event-list"></div>
-          <div class="section-head" style="margin-top: 18px;">
-            <h2>Recent Memory</h2>
-          </div>
-          <div class="event-list" id="memory-list"></div>
+          <section class="card">
+            <div class="section-head">
+              <h2>Threads</h2>
+              <button class="secondary" type="button" id="refresh-all">Refresh</button>
+            </div>
+            <div class="thread-list" id="thread-list"></div>
+          </section>
         </aside>
+
+        <section class="main stack">
+          <section class="card">
+            <div class="section-head">
+              <div class="tabs" id="tabs">
+                <button class="tab active" type="button" data-view="chat">Chat</button>
+                <button class="tab" type="button" data-view="work">Work</button>
+                <button class="tab" type="button" data-view="people">People</button>
+                <button class="tab" type="button" data-view="projects">Projects</button>
+                <button class="tab" type="button" data-view="memory">Memory</button>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="advanced-toggle" />
+                Advanced Mode
+              </label>
+            </div>
+
+            <section class="view active" id="view-chat">
+              <div class="two-col">
+                <div class="stack">
+                  <div id="chat-summary"></div>
+                  <div id="chat-messages"></div>
+                  <form class="composer" id="thread-reply-form">
+                    <input id="thread-reply-input" placeholder="Ask Comphony, or mention an agent like @Mina" value="What should happen next?" />
+                    <div class="actions">
+                      <button type="submit">Send Follow-up</button>
+                      <button class="secondary" type="button" id="continue-thread">Continue Automatically</button>
+                    </div>
+                  </form>
+                </div>
+                <div class="stack">
+                  <section>
+                    <div class="section-head"><h3>Task Graph</h3></div>
+                    <div class="stack" id="chat-tasks"></div>
+                  </section>
+                  <section>
+                    <div class="section-head"><h3>Coordination</h3></div>
+                    <div class="stack" id="chat-coordination"></div>
+                  </section>
+                </div>
+              </div>
+            </section>
+
+            <section class="view" id="view-work">
+              <div class="section-head">
+                <h2>Work</h2>
+                <span class="chip">Company-wide active task view</span>
+              </div>
+              <div class="stack" id="work-view"></div>
+            </section>
+
+            <section class="view" id="view-people">
+              <div class="section-head">
+                <h2>People</h2>
+                <span class="chip">Who exists, what they do, and what they carry</span>
+              </div>
+              <div class="three-col" id="people-view"></div>
+            </section>
+
+            <section class="view" id="view-projects">
+              <div class="section-head">
+                <h2>Projects</h2>
+                <span class="chip">Products, staffing, lanes, and delivery health</span>
+              </div>
+              <div class="three-col" id="projects-view"></div>
+            </section>
+
+            <section class="view" id="view-memory">
+              <div class="two-col">
+                <section>
+                  <div class="section-head"><h3>Related Memory</h3></div>
+                  <div class="stack" id="memory-list"></div>
+                </section>
+                <section>
+                  <div class="section-head"><h3>Similar Tasks</h3></div>
+                  <div class="stack" id="similar-task-list"></div>
+                </section>
+              </div>
+              <section style="margin-top: 16px;">
+                <div class="section-head"><h3>Recent Events</h3></div>
+                <div class="stack" id="event-list"></div>
+              </section>
+            </section>
+          </section>
+        </section>
       </section>
     </main>
 
     <script>
-      const threadList = document.getElementById("thread-list");
-      const threadDetail = document.getElementById("thread-detail");
-      const eventList = document.getElementById("event-list");
-      const memoryList = document.getElementById("memory-list");
-      const connectionStatus = document.getElementById("connection-status");
-      const intakeForm = document.getElementById("intake-form");
-      const refreshDetailButton = document.getElementById("refresh-detail");
-      const refreshEventsButton = document.getElementById("refresh-events");
-
       const state = {
+        actorId: "owner_01",
+        currentView: "chat",
+        advanced: false,
         projects: [],
+        projectOverview: [],
         agents: [],
+        people: [],
         threads: [],
         tasks: [],
         events: [],
         memories: [],
+        recommendedTasks: [],
         selectedThreadId: null,
         selectedThreadDetail: null
       };
+
+      const connectionStatus = document.getElementById("connection-status");
+      const threadList = document.getElementById("thread-list");
+      const chatSummary = document.getElementById("chat-summary");
+      const chatMessages = document.getElementById("chat-messages");
+      const chatTasks = document.getElementById("chat-tasks");
+      const chatCoordination = document.getElementById("chat-coordination");
+      const workView = document.getElementById("work-view");
+      const peopleView = document.getElementById("people-view");
+      const projectsView = document.getElementById("projects-view");
+      const memoryList = document.getElementById("memory-list");
+      const similarTaskList = document.getElementById("similar-task-list");
+      const eventList = document.getElementById("event-list");
 
       function escapeHtml(value) {
         return String(value)
@@ -376,126 +500,19 @@ export function renderWebAppHtml(): string {
         }
       }
 
-      function eligibleAgents(task) {
-        return state.agents.filter((agent) => Array.isArray(agent.assignedProjects) && agent.assignedProjects.includes(task.projectId));
+      function taskComplete(task) {
+        return ["reported", "done"].includes(task.status);
       }
 
-      function renderThreadList() {
-        threadList.innerHTML = state.threads.slice().reverse().map((thread) => {
-          const isSelected = thread.id === state.selectedThreadId;
-          const linkedTasks = state.tasks.filter((task) => thread.taskIds.includes(task.id));
-          return \`<article class="thread-card \${isSelected ? "selected" : ""}" data-thread-id="\${escapeHtml(thread.id)}">
-            <header>
-              <strong>\${escapeHtml(thread.title)}</strong>
-              <span class="meta">\${formatDate(thread.updatedAt)}</span>
-            </header>
-            <div class="meta">thread: <code>\${escapeHtml(thread.id)}</code></div>
-            <div class="meta">messages: \${thread.messageIds.length} · tasks: \${thread.taskIds.length}</div>
-            \${linkedTasks[0] ? \`<div class="meta">latest task: \${escapeHtml(linkedTasks[0].title)}</div>\` : ""}
-          </article>\`;
-        }).join("") || '<div class="empty">No threads yet. Send an intake request to create one.</div>';
+      function taskBlocked(task) {
+        return ["blocked", "waiting", "consulting"].includes(task.status) || task.needsApproval;
       }
 
-      function renderTaskCard(task) {
-        const agentButtons = eligibleAgents(task).map((agent) => {
-          const label = task.assigneeId === agent.id ? \`Assigned: \${agent.name}\` : \`Assign \${agent.name}\`;
-          return \`<button type="button" class="secondary" data-action="assign" data-task-id="\${escapeHtml(task.id)}" data-agent-id="\${escapeHtml(agent.id)}">\${escapeHtml(label)}</button>\`;
-        }).join("");
-
-        return \`<article class="task-card">
-          <header>
-            <strong>\${escapeHtml(task.title)}</strong>
-            <span class="meta">\${formatDate(task.updatedAt)}</span>
-          </header>
-          <div class="meta">task: <code>\${escapeHtml(task.id)}</code></div>
-          <div class="meta">project: \${escapeHtml(task.projectId)} · lane: \${escapeHtml(task.lane)}</div>
-          <div class="meta">status: \${escapeHtml(task.status)} · assignee: \${escapeHtml(task.assigneeId || "-")}</div>
-          <div class="meta">artifacts: \${task.artifactPaths && task.artifactPaths.length ? task.artifactPaths.length : 0}</div>
-          <p>\${escapeHtml(task.description || "No description.")}</p>
-          \${task.artifactPaths && task.artifactPaths.length ? \`
-            <div class="meta">latest artifact: \${escapeHtml(task.artifactPaths[task.artifactPaths.length - 1])}</div>
-            <div class="meta">\${task.artifactPaths.map((path) => escapeHtml(path)).join("<br />")}</div>
-          \` : ""}
-          <div class="task-actions">
-            <button type="button" data-action="autoassign" data-task-id="\${escapeHtml(task.id)}">Auto Assign</button>
-            <button type="button" class="secondary" data-action="work" data-task-id="\${escapeHtml(task.id)}">Run Turn</button>
-            <button type="button" class="secondary" data-action="handoff" data-task-id="\${escapeHtml(task.id)}" data-lane="build">To Build</button>
-            <button type="button" class="secondary" data-action="handoff" data-task-id="\${escapeHtml(task.id)}" data-lane="review">To Review</button>
-            <button type="button" class="secondary" data-action="status" data-task-id="\${escapeHtml(task.id)}" data-status="in_progress">In Progress</button>
-            <button type="button" class="secondary" data-action="status" data-task-id="\${escapeHtml(task.id)}" data-status="review">Review</button>
-            <button type="button" class="secondary" data-action="status" data-task-id="\${escapeHtml(task.id)}" data-status="done">Done</button>
-          </div>
-          \${agentButtons ? \`<div class="task-actions">\${agentButtons}</div>\` : ""}
-        </article>\`;
-      }
-
-      function renderThreadDetail() {
-        const detail = state.selectedThreadDetail;
+      function getCurrentThreadTask(detail) {
         if (!detail) {
-          threadDetail.innerHTML = '<div class="empty">Select a thread to inspect its messages and tasks.</div>';
-          return;
+          return null;
         }
-
-        const messagesHtml = detail.messages.map((message) => \`<article class="message-card">
-          <header>
-            <strong>\${escapeHtml(message.role)}</strong>
-            <span class="meta">\${formatDate(message.createdAt)}</span>
-          </header>
-          <div class="meta">message: <code>\${escapeHtml(message.id)}</code></div>
-          <div class="meta">routed project: \${escapeHtml(message.routedProjectId || "-")} · lane: \${escapeHtml(message.suggestedLane || "-")}</div>
-          <p>\${escapeHtml(message.body)}</p>
-        </article>\`).join("");
-
-        const tasksHtml = detail.tasks.map(renderTaskCard).join("");
-
-        threadDetail.innerHTML = \`
-          <section class="detail-grid">
-            <article class="message-card">
-              <header>
-                <strong>\${escapeHtml(detail.thread.title)}</strong>
-                <span class="meta">\${formatDate(detail.thread.updatedAt)}</span>
-              </header>
-              <div class="meta">thread: <code>\${escapeHtml(detail.thread.id)}</code></div>
-              <div class="meta">messages: \${detail.messages.length} · tasks: \${detail.tasks.length}</div>
-            </article>
-            <form class="composer" id="thread-reply-form">
-              <input id="thread-reply-input" placeholder="Ask Comphony about this thread" value="What is the current status?" />
-              <div class="composer-actions">
-                <div class="status-pill">This adds a user follow-up and a Comphony response.</div>
-                <button type="submit">Send Follow-up</button>
-              </div>
-            </form>
-            <section>
-              <div class="section-head"><h3>Messages</h3></div>
-              <div class="message-list">\${messagesHtml || '<div class="empty">No messages on this thread yet.</div>'}</div>
-            </section>
-            <section>
-              <div class="section-head"><h3>Tasks</h3></div>
-              <div class="task-list">\${tasksHtml || '<div class="empty">No tasks linked to this thread yet.</div>'}</div>
-            </section>
-          </section>
-        \`;
-      }
-
-      function renderEvents() {
-        eventList.innerHTML = state.events.slice(0, 16).map((event) => \`<article class="event-card">
-          <header>
-            <strong><code>\${escapeHtml(event.type)}</code></strong>
-            <span class="meta">\${formatDate(event.timestamp)}</span>
-          </header>
-          <div class="meta">\${escapeHtml(event.entityType)} · <code>\${escapeHtml(event.entityId)}</code></div>
-        </article>\`).join("") || '<div class="empty">No events yet.</div>';
-      }
-
-      function renderMemories() {
-        memoryList.innerHTML = state.memories.slice(0, 10).map((memory) => \`<article class="event-card">
-          <header>
-            <strong><code>\${escapeHtml(memory.kind)}</code></strong>
-            <span class="meta">\${formatDate(memory.createdAt)}</span>
-          </header>
-          <div class="meta">\${escapeHtml(memory.scope)} · \${escapeHtml(memory.projectId || "-")}</div>
-          <div>\${escapeHtml(memory.body)}</div>
-        </article>\`).join("") || '<div class="empty">No memory yet.</div>';
+        return detail.tasks.find((task) => task.parentTaskId && !taskComplete(task)) || detail.tasks.find((task) => !taskComplete(task)) || detail.tasks[0] || null;
       }
 
       function renderStats() {
@@ -505,51 +522,290 @@ export function renderWebAppHtml(): string {
         document.getElementById("stat-events").textContent = String(state.events.length);
       }
 
-      async function refreshSnapshots() {
-        const [projectsRes, agentsRes, threadsRes, tasksRes, eventsRes, memoriesRes] = await Promise.all([
-          fetch("/v1/projects"),
-          fetch("/v1/agents"),
-          fetch("/v1/threads"),
-          fetch("/v1/tasks"),
-          fetch("/v1/events?limit=20"),
-          fetch(state.selectedThreadId ? "/v1/memory?threadId=" + encodeURIComponent(state.selectedThreadId) + "&limit=10" : "/v1/memory?limit=10")
-        ]);
-        state.projects = (await projectsRes.json()).projects;
-        state.agents = (await agentsRes.json()).agents;
-        state.threads = (await threadsRes.json()).threads;
-        state.tasks = (await tasksRes.json()).tasks;
-        state.events = (await eventsRes.json()).events;
-        state.memories = (await memoriesRes.json()).memories;
-        if (!state.selectedThreadId && state.threads.length > 0) {
-          state.selectedThreadId = state.threads[state.threads.length - 1].id;
+      function renderThreadList() {
+        threadList.innerHTML = state.threads.slice().reverse().map((thread) => {
+          const linkedTasks = state.tasks.filter((task) => thread.taskIds.includes(task.id));
+          const activeTask = linkedTasks.find((task) => !taskComplete(task) && task.parentTaskId) || linkedTasks[0];
+          const selected = thread.id === state.selectedThreadId ? "selected" : "";
+          return \`<article class="thread-card \${selected}" data-thread-id="\${escapeHtml(thread.id)}">
+            <header>
+              <strong>\${escapeHtml(thread.title)}</strong>
+              <span class="meta">\${formatDate(thread.updatedAt)}</span>
+            </header>
+            <div class="meta">messages: \${thread.messageIds.length} · tasks: \${thread.taskIds.length}</div>
+            \${activeTask ? \`<div class="meta">active: \${escapeHtml(activeTask.title)} · \${escapeHtml(activeTask.status)}</div>\` : '<div class="meta">No linked task yet.</div>'}
+          </article>\`;
+        }).join("") || '<div class="empty">No threads yet. Start by telling Comphony what outcome you want.</div>';
+      }
+
+      function renderMessage(message) {
+        const target = message.targetAgentId ? \` · to \${escapeHtml(message.targetAgentId)}\` : "";
+        return \`<article class="message-card">
+          <header>
+            <strong>\${escapeHtml(message.role)}</strong>
+            <span class="meta">\${formatDate(message.createdAt)}</span>
+          </header>
+          <div class="meta">project: \${escapeHtml(message.routedProjectId || "-")} · lane: \${escapeHtml(message.suggestedLane || "-")}\${target}</div>
+          <p>\${escapeHtml(message.body)}</p>
+        </article>\`;
+      }
+
+      function renderTaskCard(task, detail) {
+        const isParent = !task.parentTaskId;
+        const childClass = isParent ? "is-parent" : "is-child";
+        const current = getCurrentThreadTask(detail);
+        const primaryAction = current && current.id === task.id && !taskComplete(task)
+          ? \`<button type="button" data-action="continue-thread">Continue</button>\`
+          : "";
+        const simpleNext = taskComplete(task)
+          ? '<span class="chip">Completed</span>'
+          : taskBlocked(task)
+            ? \`<span class="chip is-danger">\${escapeHtml(task.blockingReason || "Waiting")}</span>\`
+            : \`<span class="chip">Assignee: \${escapeHtml(task.assigneeId || "unassigned")}</span>\`;
+
+        const advanced = \`
+          <div class="actions advanced-only">
+            <button type="button" class="secondary" data-action="autoassign" data-task-id="\${escapeHtml(task.id)}">Auto Assign</button>
+            <button type="button" class="secondary" data-action="work" data-task-id="\${escapeHtml(task.id)}">Run Turn</button>
+            <button type="button" class="secondary" data-action="handoff" data-task-id="\${escapeHtml(task.id)}" data-lane="build">To Build</button>
+            <button type="button" class="secondary" data-action="handoff" data-task-id="\${escapeHtml(task.id)}" data-lane="review">To Review</button>
+            <button type="button" class="secondary" data-action="sync" data-task-id="\${escapeHtml(task.id)}" data-provider="linear">Sync Linear</button>
+            <button type="button" class="secondary" data-action="request-approval" data-task-id="\${escapeHtml(task.id)}" data-approval-action="repo_write">Need Approval</button>
+          </div>
+        \`;
+        const externalRefs = Array.isArray(task.externalRefs) && task.externalRefs.length > 0
+          ? \`<div class="meta">external: \${task.externalRefs.map((ref) => escapeHtml(ref.provider + ":" + (ref.externalKey || ref.externalId || "linked"))).join(" · ")}</div>\`
+          : "";
+
+        return \`<article class="task-card \${childClass}">
+          <header>
+            <strong>\${escapeHtml(task.title)}</strong>
+            <span class="meta">\${formatDate(task.updatedAt)}</span>
+          </header>
+          <div class="meta">lane=\${escapeHtml(task.lane)} · status=\${escapeHtml(task.status)} · assignee=\${escapeHtml(task.assigneeId || "-")}</div>
+          <div class="meta">depends on: \${task.dependsOnTaskIds.length ? escapeHtml(task.dependsOnTaskIds.join(", ")) : "-"}</div>
+          <div class="meta">artifacts: \${task.artifactPaths.length}</div>
+          \${externalRefs}
+          \${task.completionSummary ? \`<div class="meta">summary: \${escapeHtml(task.completionSummary)}</div>\` : ""}
+          <p>\${escapeHtml(task.description || "No description.")}</p>
+          <div class="actions">
+            \${primaryAction}
+            \${simpleNext}
+          </div>
+          \${advanced}
+        </article>\`;
+      }
+
+      function renderCoordination(detail) {
+        const items = [];
+        detail.consultations.forEach((item) => {
+          items.push(\`<article class="info-card">
+            <header><strong>Consultation</strong><span class="meta">\${escapeHtml(item.status)}</span></header>
+            <div class="meta">to: \${escapeHtml(item.toAgentId)} · task: \${escapeHtml(item.taskId)}</div>
+            <div>\${escapeHtml(item.reason)}</div>
+          </article>\`);
+        });
+        detail.reviews.forEach((item) => {
+          items.push(\`<article class="info-card">
+            <header><strong>Review</strong><span class="meta">\${escapeHtml(item.status)}</span></header>
+            <div class="meta">reviewer: \${escapeHtml(item.reviewerAgentId)} · task: \${escapeHtml(item.taskId)}</div>
+            <div>\${escapeHtml(item.reason)}</div>
+          </article>\`);
+        });
+        detail.approvals.forEach((item) => {
+          items.push(\`<article class="info-card">
+            <header><strong>Approval</strong><span class="meta">\${escapeHtml(item.status)}</span></header>
+            <div class="meta">action: \${escapeHtml(item.action)} · task: \${escapeHtml(item.taskId || "-")}</div>
+            <div>\${escapeHtml(item.reason)}</div>
+          </article>\`);
+        });
+        chatCoordination.innerHTML = items.join("") || '<div class="empty">No active consultations, reviews, or approvals on this thread.</div>';
+      }
+
+      function renderChatView() {
+        const detail = state.selectedThreadDetail;
+        if (!detail) {
+          chatSummary.innerHTML = '<div class="empty">Select a thread to see what Comphony is doing.</div>';
+          chatMessages.innerHTML = "";
+          chatTasks.innerHTML = "";
+          chatCoordination.innerHTML = "";
+          return;
         }
-        renderStats();
-        renderThreadList();
-        renderEvents();
-        renderMemories();
-        await refreshThreadDetail();
+
+        const currentTask = getCurrentThreadTask(detail);
+        chatSummary.innerHTML = \`<article class="info-card">
+          <header>
+            <strong>\${escapeHtml(detail.thread.title)}</strong>
+            <span class="meta">\${formatDate(detail.thread.updatedAt)}</span>
+          </header>
+          <div class="meta">thread: <code>\${escapeHtml(detail.thread.id)}</code></div>
+          <div class="meta">messages: \${detail.messages.length} · tasks: \${detail.tasks.length}</div>
+          \${currentTask ? \`<div class="meta">current focus: \${escapeHtml(currentTask.title)} · \${escapeHtml(currentTask.status)} · \${escapeHtml(currentTask.assigneeId || "unassigned")}</div>\` : '<div class="meta">No active task.</div>'}
+        </article>\`;
+
+        chatMessages.innerHTML = detail.messages.map(renderMessage).join("") || '<div class="empty">No messages yet.</div>';
+        chatTasks.innerHTML = detail.tasks
+          .slice()
+          .sort((left, right) => {
+            if (left.parentTaskId === null && right.parentTaskId !== null) {
+              return -1;
+            }
+            if (left.parentTaskId !== null && right.parentTaskId === null) {
+              return 1;
+            }
+            return left.createdAt.localeCompare(right.createdAt);
+          })
+          .map((task) => renderTaskCard(task, detail))
+          .join("") || '<div class="empty">No tasks linked to this thread.</div>';
+
+        renderCoordination(detail);
+      }
+
+      function renderWorkView() {
+        const activeTasks = state.tasks.filter((task) => !taskComplete(task));
+        workView.innerHTML = activeTasks.map((task) => \`<article class="info-card">
+          <header>
+            <strong>\${escapeHtml(task.title)}</strong>
+            <span class="meta">\${escapeHtml(task.status)}</span>
+          </header>
+          <div class="meta">project: \${escapeHtml(task.projectId)} · lane: \${escapeHtml(task.lane)}</div>
+          <div class="meta">assignee: \${escapeHtml(task.assigneeId || "-")} · parent: \${escapeHtml(task.parentTaskId || "-")}</div>
+          <div class="meta">external: \${Array.isArray(task.externalRefs) && task.externalRefs.length > 0 ? escapeHtml(task.externalRefs.map((ref) => ref.provider + ":" + (ref.externalKey || ref.externalId || "linked")).join(", ")) : "-"}</div>
+          \${task.blockingReason ? \`<div class="meta">blocker: \${escapeHtml(task.blockingReason)}</div>\` : ""}
+        </article>\`).join("") || '<div class="empty">No active tasks right now.</div>';
+      }
+
+      function renderPeopleView() {
+        peopleView.innerHTML = state.people.map((person) => \`<article class="info-card">
+          <header>
+            <strong>\${escapeHtml(person.id)}</strong>
+            <span class="meta">\${escapeHtml(person.role)}</span>
+          </header>
+          <div class="meta">projects: \${escapeHtml(person.assignedProjects.join(", ") || "-")}</div>
+          <div class="meta">active tasks: \${person.activeTaskCount} · blocked: \${person.blockedTaskCount}</div>
+          <div class="meta">trust: \${escapeHtml(person.trustState)}</div>
+          <div class="meta">current: \${escapeHtml(person.currentTaskIds.join(", ") || "-")}</div>
+        </article>\`).join("") || '<div class="empty">No registered people yet.</div>';
+      }
+
+      function renderProjectsView() {
+        projectsView.innerHTML = state.projectOverview.map((project) => \`<article class="info-card">
+          <header>
+            <strong>\${escapeHtml(project.name)}</strong>
+            <span class="meta">\${escapeHtml(project.id)}</span>
+          </header>
+          <div class="meta">active: \${project.activeTaskCount} · blocked: \${project.blockedTaskCount}</div>
+          <div class="meta">threads: \${project.openThreadCount} · agents: \${project.agentIds.length}</div>
+          <div class="meta">lanes: \${escapeHtml(project.lanes.join(", "))}</div>
+          <div class="meta">latest artifact: \${escapeHtml(project.latestArtifactPath || "-")}</div>
+        </article>\`).join("") || '<div class="empty">No projects yet.</div>';
+      }
+
+      function renderMemoryView() {
+        memoryList.innerHTML = state.memories.map((memory) => \`<article class="info-card">
+          <header>
+            <strong>\${escapeHtml(memory.kind)}</strong>
+            <span class="meta">\${formatDate(memory.createdAt)}</span>
+          </header>
+          <div class="meta">\${escapeHtml(memory.scope)} · \${escapeHtml(memory.projectId || "-")} \${typeof memory.score === "number" ? "· score " + escapeHtml(memory.score) : ""}</div>
+          <div>\${escapeHtml(memory.body)}</div>
+        </article>\`).join("") || '<div class="empty">No related memory yet.</div>';
+
+        similarTaskList.innerHTML = state.recommendedTasks.map((task) => \`<article class="info-card">
+          <header>
+            <strong>\${escapeHtml(task.title)}</strong>
+            <span class="meta">\${typeof task.score === "number" ? "score " + escapeHtml(task.score) : ""}</span>
+          </header>
+          <div class="meta">\${escapeHtml(task.projectId)} · \${escapeHtml(task.lane)} · \${escapeHtml(task.status)}</div>
+          <div class="meta">assignee: \${escapeHtml(task.assigneeId || "-")}</div>
+        </article>\`).join("") || '<div class="empty">No similar tasks yet.</div>';
+
+        eventList.innerHTML = state.events.slice(0, 20).map((event) => \`<article class="info-card">
+          <header>
+            <strong><code>\${escapeHtml(event.type)}</code></strong>
+            <span class="meta">\${formatDate(event.timestamp)}</span>
+          </header>
+          <div class="meta">\${escapeHtml(event.entityType)} · <code>\${escapeHtml(event.entityId)}</code></div>
+        </article>\`).join("") || '<div class="empty">No recent events.</div>';
+      }
+
+      function renderViews() {
+        renderChatView();
+        renderWorkView();
+        renderPeopleView();
+        renderProjectsView();
+        renderMemoryView();
+      }
+
+      async function refreshRecommendationPanels() {
+        const latestUserMessage = state.selectedThreadDetail
+          ? [...state.selectedThreadDetail.messages].reverse().find((message) => message.role === "user")
+          : null;
+        const currentTask = getCurrentThreadTask(state.selectedThreadDetail);
+        const memoryUrl = state.selectedThreadId
+          ? "/v1/memory/recommend?threadId=" + encodeURIComponent(state.selectedThreadId) + "&limit=10" + (latestUserMessage ? "&query=" + encodeURIComponent(latestUserMessage.body) : "")
+          : "/v1/memory/recommend?limit=10";
+        const taskUrl = state.selectedThreadId
+          ? "/v1/tasks/recommend?threadId=" + encodeURIComponent(state.selectedThreadId)
+              + (currentTask ? "&taskId=" + encodeURIComponent(currentTask.id) + "&projectId=" + encodeURIComponent(currentTask.projectId) : "")
+              + "&limit=10"
+              + (latestUserMessage ? "&query=" + encodeURIComponent(latestUserMessage.body) : "")
+          : "/v1/tasks/recommend?limit=10";
+
+        const [memoryRes, taskRes] = await Promise.all([fetch(memoryUrl), fetch(taskUrl)]);
+        state.memories = (await memoryRes.json()).memories;
+        state.recommendedTasks = (await taskRes.json()).tasks;
       }
 
       async function refreshThreadDetail() {
         if (!state.selectedThreadId) {
           state.selectedThreadDetail = null;
-          renderThreadDetail();
+          renderViews();
           return;
         }
         const response = await fetch("/v1/threads/" + encodeURIComponent(state.selectedThreadId));
         if (!response.ok) {
           state.selectedThreadDetail = null;
-          renderThreadDetail();
+          renderViews();
           return;
         }
         state.selectedThreadDetail = await response.json();
-        renderThreadDetail();
+        await refreshRecommendationPanels();
+        renderViews();
+      }
+
+      async function refreshSnapshots() {
+        const [projectsRes, projectOverviewRes, agentsRes, peopleRes, threadsRes, tasksRes, eventsRes] = await Promise.all([
+          fetch("/v1/projects"),
+          fetch("/v1/projects/overview"),
+          fetch("/v1/agents"),
+          fetch("/v1/people"),
+          fetch("/v1/threads"),
+          fetch("/v1/tasks"),
+          fetch("/v1/events?limit=20")
+        ]);
+        state.projects = (await projectsRes.json()).projects;
+        state.projectOverview = (await projectOverviewRes.json()).projects;
+        state.agents = (await agentsRes.json()).agents;
+        state.people = (await peopleRes.json()).people;
+        state.threads = (await threadsRes.json()).threads;
+        state.tasks = (await tasksRes.json()).tasks;
+        state.events = (await eventsRes.json()).events;
+        if (!state.selectedThreadId && state.threads.length > 0) {
+          state.selectedThreadId = state.threads[state.threads.length - 1].id;
+        }
+        renderStats();
+        renderThreadList();
+        await refreshThreadDetail();
       }
 
       async function postJson(url, payload) {
         const response = await fetch(url, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Comphony-Actor-Id": state.actorId
+          },
           body: JSON.stringify(payload)
         });
         if (!response.ok) {
@@ -559,7 +815,24 @@ export function renderWebAppHtml(): string {
         return response.json();
       }
 
-      intakeForm.addEventListener("submit", async (event) => {
+      document.getElementById("advanced-toggle").addEventListener("change", (event) => {
+        state.advanced = event.target.checked;
+        document.body.classList.toggle("advanced", state.advanced);
+      });
+
+      document.getElementById("tabs").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-view]");
+        if (!button) {
+          return;
+        }
+        state.currentView = button.getAttribute("data-view");
+        document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab === button));
+        document.querySelectorAll(".view").forEach((view) => {
+          view.classList.toggle("active", view.id === "view-" + state.currentView);
+        });
+      });
+
+      document.getElementById("intake-form").addEventListener("submit", async (event) => {
         event.preventDefault();
         const title = document.getElementById("intake-title").value.trim();
         const body = document.getElementById("intake-body").value.trim();
@@ -571,62 +844,21 @@ export function renderWebAppHtml(): string {
         await refreshSnapshots();
       });
 
-      refreshDetailButton.addEventListener("click", async () => {
-        await refreshThreadDetail();
-      });
-
-      refreshEventsButton.addEventListener("click", async () => {
+      document.getElementById("refresh-all").addEventListener("click", async () => {
         await refreshSnapshots();
       });
 
       threadList.addEventListener("click", async (event) => {
-        const threadCard = event.target.closest("[data-thread-id]");
-        if (!threadCard) {
+        const card = event.target.closest("[data-thread-id]");
+        if (!card) {
           return;
         }
-        state.selectedThreadId = threadCard.getAttribute("data-thread-id");
+        state.selectedThreadId = card.getAttribute("data-thread-id");
         renderThreadList();
         await refreshThreadDetail();
       });
 
-      threadDetail.addEventListener("click", async (event) => {
-        const button = event.target.closest("[data-action]");
-        if (!button) {
-          return;
-        }
-        const action = button.getAttribute("data-action");
-        const taskId = button.getAttribute("data-task-id");
-        if (!taskId) {
-          return;
-        }
-        if (action === "assign") {
-          await postJson("/v1/tasks/assign", {
-            taskId,
-            agentId: button.getAttribute("data-agent-id")
-          });
-        } else if (action === "autoassign") {
-          await postJson("/v1/tasks/assign", { taskId });
-        } else if (action === "work") {
-          await postJson("/v1/tasks/work", { taskId });
-        } else if (action === "handoff") {
-          await postJson("/v1/tasks/handoff", {
-            taskId,
-            lane: button.getAttribute("data-lane")
-          });
-        } else if (action === "status") {
-          await postJson("/v1/tasks/status", {
-            taskId,
-            status: button.getAttribute("data-status")
-          });
-        }
-        await refreshSnapshots();
-      });
-
-      threadDetail.addEventListener("submit", async (event) => {
-        const form = event.target.closest("#thread-reply-form");
-        if (!form) {
-          return;
-        }
+      document.getElementById("thread-reply-form").addEventListener("submit", async (event) => {
         event.preventDefault();
         if (!state.selectedThreadId) {
           return;
@@ -636,11 +868,49 @@ export function renderWebAppHtml(): string {
         if (!body) {
           return;
         }
-        await postJson("/v1/threads/respond", {
-          threadId: state.selectedThreadId,
-          body
-        });
+        await postJson("/v1/threads/respond", { threadId: state.selectedThreadId, body });
         input.value = "";
+        await refreshSnapshots();
+      });
+
+      document.getElementById("continue-thread").addEventListener("click", async () => {
+        if (!state.selectedThreadId) {
+          return;
+        }
+        await postJson("/v1/threads/continue", { threadId: state.selectedThreadId });
+        await refreshSnapshots();
+      });
+
+      chatTasks.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-action]");
+        if (!button) {
+          return;
+        }
+        const action = button.getAttribute("data-action");
+        const taskId = button.getAttribute("data-task-id");
+        if (action === "continue-thread") {
+          if (!state.selectedThreadId) {
+            return;
+          }
+          await postJson("/v1/threads/continue", { threadId: state.selectedThreadId });
+        } else if (action === "autoassign" && taskId) {
+          await postJson("/v1/tasks/assign", { taskId });
+        } else if (action === "work" && taskId) {
+          await postJson("/v1/tasks/work", { taskId });
+        } else if (action === "handoff" && taskId) {
+          await postJson("/v1/tasks/handoff", { taskId, lane: button.getAttribute("data-lane") });
+        } else if (action === "sync" && taskId) {
+          await postJson("/v1/tasks/sync", {
+            taskId,
+            provider: button.getAttribute("data-provider") || "linear"
+          });
+        } else if (action === "request-approval" && taskId) {
+          await postJson("/v1/approvals/request", {
+            taskId,
+            action: button.getAttribute("data-approval-action") || "guarded_action",
+            reason: "Approval requested from advanced mode."
+          });
+        }
         await refreshSnapshots();
       });
 
