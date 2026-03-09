@@ -105,6 +105,7 @@ Comphony standardizes the local machine layout like this:
 comphony/
   .codex/
   AGENTS.md
+  agents/
   MISSION.md
   MISSION.template.md
   docs/
@@ -119,6 +120,8 @@ What each folder means:
   - operating docs and workflow templates
 - `.codex/skills/`
   - project-local Codex skills such as `ui-ux-pro-max`
+- `agents/`
+  - first-party installable agent packages
 - `repos/`
   - canonical source repos
 - `workspaces/`
@@ -166,6 +169,14 @@ The local environment template is tracked as [.env.example](.env.example), while
 - [System Architecture](docs/COMPHONY_SYSTEM_ARCHITECTURE.md)
 - [Data Model](docs/COMPHONY_DATA_MODEL.md)
 - [UI Information Architecture](docs/COMPHONY_UI_INFORMATION_ARCHITECTURE.md)
+- [Trust And Permissions](docs/COMPHONY_TRUST_AND_PERMISSIONS.md)
+- [Sync And Source Of Truth](docs/COMPHONY_SYNC_AND_SOURCE_OF_TRUTH.md)
+- [Autonomy Policy](docs/COMPHONY_AUTONOMY_POLICY.md)
+- [Agent Package Spec](docs/COMPHONY_AGENT_PACKAGE_SPEC.md)
+- [Execution State Machine](docs/COMPHONY_EXECUTION_STATE_MACHINE.md)
+- [API And Event Protocol](docs/COMPHONY_API_AND_EVENT_PROTOCOL.md)
+- [Config Spec](docs/COMPHONY_CONFIG_SPEC.md)
+- [Identity And Memory Policy](docs/COMPHONY_IDENTITY_AND_MEMORY_POLICY.md)
 - [MVP And Development](docs/COMPHONY_MVP_AND_DEVELOPMENT.md)
 - [Operating-Level Development Plan](docs/OPERATING_LEVEL_DEVELOPMENT_PLAN.md)
 - [Comphony Desk Model](docs/COMPHONY_DESK_MODEL.md)

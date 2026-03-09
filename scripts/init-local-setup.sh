@@ -27,5 +27,5 @@ echo "  - ${ROOT_DIR}/workflows"
 echo
 echo "Next steps:"
 echo "  1. Fill in ${ROOT_DIR}/.env"
-echo "  2. Ask Codex to set up Symphony + Linear end-to-end"
+echo "  2. Ask Codex to set up the current Comphony runtime foundation end-to-end"
 echo "  3. Run ./tests/validate-setup.sh"

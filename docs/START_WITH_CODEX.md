@@ -1,14 +1,16 @@
 # Start With Codex
 
-이 문서는 `comphony`를 클론한 뒤, Codex가 이 저장소만 읽고도 `Symphony + Linear`를 실제로 연결하고 작동 가능한 구조로 세팅할 수 있게 만드는 시작 가이드다.
+이 문서는 `comphony`를 클론한 뒤, Codex가 이 저장소만 읽고도 현재 런타임 기반을 실제로 세팅할 수 있게 만드는 시작 가이드다.
+
+현재 기준에서 그 기반은 보통 `Comphony`의 초기 실행 토대로서 `Symphony + Linear` 자산을 함께 활용하는 형태다.
 
 목표는 단순하다.
 
 - 문서만 읽고 끝나는 것이 아니라
-- Linear 프로젝트를 준비하고
-- workflow 파일을 만들고
-- Symphony를 실행할 수 있게 하고
-- 최종적으로는 Linear 이슈만 만들면 작업이 시작되도록 만든다
+- 현재 런타임 기반을 준비하고
+- 필요한 Linear 프로젝트와 workflow 파일을 만들고
+- Symphony 기반 실행 자산을 연결할 수 있게 하고
+- 최종적으로는 `Comphony`의 현재 운영 기반이 실제로 돌아가게 만든다
 
 ## 0. 추천 로컬 폴더 구조
 
@@ -47,7 +49,7 @@ comphony/
 ```text
 Read AGENTS.md and docs/START_WITH_CODEX.md.
 If MISSION.md does not exist, create it from MISSION.template.md.
-Set up Symphony + Linear end-to-end for this machine.
+Set up the current Comphony runtime foundations for this machine.
 Continue until the acceptance criteria in MISSION.md are satisfied.
 Only stop if you are blocked by missing credentials, permissions, or a required naming decision.
 ```
@@ -57,7 +59,7 @@ Only stop if you are blocked by missing credentials, permissions, or a required 
 ```text
 Read this repo and set it up for me.
 Create any missing local setup files yourself, including MISSION.md.
-Keep going until Linear + Symphony is working end-to-end.
+Keep going until the current Comphony runtime foundation is working end-to-end.
 ```
 
 ### Codex
@@ -66,11 +68,13 @@ Codex는 아래 우선순위로 문서를 읽어야 한다.
 
 1. [../AGENTS.md](../AGENTS.md)
 2. [../MISSION.md](../MISSION.md) 또는 [../MISSION.template.md](../MISSION.template.md)
-3. [LOCAL_LAYOUT.md](LOCAL_LAYOUT.md)
-4. [SYMPHONY_BASICS.md](SYMPHONY_BASICS.md)
-5. [COMPHONY_COMPANY_MODEL.md](COMPHONY_COMPANY_MODEL.md)
-6. [COMPHONY_DESK_MODEL.md](COMPHONY_DESK_MODEL.md)
-7. 필요한 경우 [SCENARIO_MATRIX.md](SCENARIO_MATRIX.md), [WORKFLOW_PARTS.md](WORKFLOW_PARTS.md), [ISSUE_LIFECYCLE.md](ISSUE_LIFECYCLE.md)
+3. [COMPHONY_PURPOSE_AND_VISION.md](COMPHONY_PURPOSE_AND_VISION.md)
+4. [COMPHONY_FINAL_ARCHITECTURE.md](COMPHONY_FINAL_ARCHITECTURE.md)
+5. [LOCAL_LAYOUT.md](LOCAL_LAYOUT.md)
+6. [SYMPHONY_BASICS.md](SYMPHONY_BASICS.md)
+7. [COMPHONY_COMPANY_MODEL.md](COMPHONY_COMPANY_MODEL.md)
+8. [COMPHONY_DESK_MODEL.md](COMPHONY_DESK_MODEL.md)
+9. 필요한 경우 [SCENARIO_MATRIX.md](SCENARIO_MATRIX.md), [WORKFLOW_PARTS.md](WORKFLOW_PARTS.md), [ISSUE_LIFECYCLE.md](ISSUE_LIFECYCLE.md)
 
 ## 2. Codex가 실제로 수행해야 하는 단계
 
@@ -281,6 +285,12 @@ Codex는 아래가 모두 참일 때까지 계속 도와야 한다.
 5. 세팅이 구체화되면 `MISSION.md`도 실제 값으로 갱신한다.
 
 즉 `MISSION.template.md`는 사람용 사전 작성 양식이라기보다 Codex가 `MISSION.md`를 만드는 기준 문서다.
+
+주의:
+
+- 이 문서는 `현재 런타임 기반을 세팅하는 전이 단계 가이드`다
+- `Comphony`의 최종 제품 모델은 canonical architecture 문서를 따른다
+- 따라서 setup 단계에서 `Symphony + Linear`를 활용하더라도, 제품의 중심 모델은 `대화 + task graph + agent registry` 쪽으로 해석해야 한다
 
 ## 8. 같이 읽으면 좋은 문서
 

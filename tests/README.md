@@ -44,7 +44,7 @@ Example prompt:
 ```text
 Read this repo and set it up for me.
 Create any missing local setup files yourself, including MISSION.md.
-Keep going until Linear + Symphony is working end-to-end.
+Keep going until the current Comphony runtime foundation is working end-to-end.
 ```
 
 ## 5. Validate the result

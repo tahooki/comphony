@@ -1,6 +1,8 @@
 # Comphony AGENTS
 
-이 저장소는 `Symphony + Linear` 운영 체계를 설계하고 실제로 세팅하기 위한 컨트롤 레포다.
+이 저장소는 `Comphony`의 현재 런타임 기반을 설계하고 실제로 세팅하기 위한 컨트롤 레포다.
+
+현재 런타임 기반은 여전히 `Symphony + Linear` 자산을 활용할 수 있지만, 제품의 canonical 방향은 `Comphony = conversation-driven company OS`다.
 
 ## 이 저장소에서 Codex가 해야 할 일
 
@@ -12,7 +14,7 @@
 2. [docs/START_WITH_CODEX.md](docs/START_WITH_CODEX.md)를 읽는다.
 3. 루트의 `MISSION.md`가 있으면 그것을 목표 문서로 사용한다.
 4. `MISSION.md`가 없으면 [MISSION.template.md](MISSION.template.md)를 기준으로 Codex가 먼저 `MISSION.md`를 생성한다.
-5. 목표가 정해지면 `Symphony 설치/검증 -> Linear 연동 -> Linear 프로젝트/상태 준비 -> workflow 생성 -> 실행 검증 -> 테스트 이슈 확인` 순서로 진행한다.
+5. 목표가 정해지면 `런타임 기반 확인 -> Symphony 설치/검증 -> Linear 연동 -> Linear 프로젝트/상태 준비 -> workflow 생성 -> 실행 검증 -> 테스트 이슈 확인` 순서로 진행한다.
 6. 목표 문서의 acceptance criteria가 충족될 때까지 계속 진행한다.
 
 ## 표준 로컬 구조
@@ -48,23 +50,23 @@
 
 아래가 충족되면 "작동하는 초기 셋업"으로 본다.
 
-- Symphony가 설치되어 있거나 실행 가능하다.
+- 현재 런타임 기반이 설치되어 있거나 실행 가능하다.
 - `LINEAR_API_KEY`가 안전하게 설정되어 있다.
 - 적어도 하나 이상의 Linear 프로젝트가 준비되어 있다.
 - 적어도 하나 이상의 workflow 파일이 실제 repo 또는 research 작업과 연결되어 있다.
-- Symphony 실행 방법이 문서화되어 있다.
-- 테스트용 이슈를 만들면 Symphony가 집어서 처리할 수 있다.
+- Symphony 기반 실행 방법 또는 동등한 현재 런타임 실행 방법이 문서화되어 있다.
+- 테스트용 이슈나 요청을 만들면 현재 런타임이 실제로 처리할 수 있다.
 - 표준 로컬 경로 구조가 정해져 있고 실제 경로가 문서에 반영되어 있다.
 - `.env` 기반 로컬 환경값과 셋업 검증 흐름이 준비되어 있다.
 
 ## 추천 읽는 순서
 
-1. [docs/START_WITH_CODEX.md](docs/START_WITH_CODEX.md)
-2. [docs/LOCAL_LAYOUT.md](docs/LOCAL_LAYOUT.md)
-3. [MISSION.template.md](MISSION.template.md)
-4. [docs/SYMPHONY_BASICS.md](docs/SYMPHONY_BASICS.md)
-5. [docs/COMPHONY_DESK_MODEL.md](docs/COMPHONY_DESK_MODEL.md)
-6. [docs/COMPHONY_COMPANY_MODEL.md](docs/COMPHONY_COMPANY_MODEL.md)
+1. [docs/COMPHONY_PURPOSE_AND_VISION.md](docs/COMPHONY_PURPOSE_AND_VISION.md)
+2. [docs/COMPHONY_FINAL_ARCHITECTURE.md](docs/COMPHONY_FINAL_ARCHITECTURE.md)
+3. [docs/START_WITH_CODEX.md](docs/START_WITH_CODEX.md)
+4. [docs/LOCAL_LAYOUT.md](docs/LOCAL_LAYOUT.md)
+5. [MISSION.template.md](MISSION.template.md)
+6. [docs/SYMPHONY_BASICS.md](docs/SYMPHONY_BASICS.md)
 
 ## `MISSION.md` 생성 규칙
 

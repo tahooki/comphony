@@ -172,14 +172,14 @@ lanes:
     project: Idea Lab
     state: Planning
     repo_mode: none
-    skill: compony-pm
+    skill: comphony-pm
   - key: product_core_dev
     type: dev
     project: Product - Core
     state: Todo
     repo_mode: canonical
     repo_slug: product-core
-    skill: compony-dev
+    skill: comphony-dev
 contracts:
   parent_child:
     report_state: Reported
