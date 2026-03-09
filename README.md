@@ -1,56 +1,42 @@
 # Comphony
 
-Build an AI company on top of `Symphony`, `Linear`, and `Codex`.
+Build and operate an AI-native company through one front door.
+
+`Comphony` is evolving from a Symphony/Linear operating prototype into a local-first company operating system where a user talks to `Comphony`, agents collaborate, and work flows across projects with memory, handoff, review, and reporting.
 
 Clone this repo, open Codex, and ask it to set everything up for you in one shot.
-Comphony is designed as a control repo for turning a blank machine into a working AI operating system where ideas become projects, projects become repos, and Linear issues become real execution.
 
-## What This Builds
+## Product Direction
 
-Comphony is not just a docs repo. It is a model for an AI-native company structure.
+Comphony is not just a workflow repo.
 
-The default company looks like this:
+It is meant to become:
 
-- `Comphony Desk`
-  - single human-facing intake lane
-  - classifies requests and delegates work
-  - collects final reports from downstream projects
-- `Idea Lab`
-  - collect ideas
-  - refine requests
-  - research opportunities
-- `Project Managing`
-  - create new repos
-  - create new Linear projects
-  - generate new workflow files
-  - bootstrap new operating lanes
-- `Product - <Name>`
-  - run real product work
-  - split work across PM, Research, Design, and Dev if needed
-- optional `Ops` or `Maintenance` lanes
-  - handle operational work, automation, and production follow-up
+- a single conversational front door called `Comphony`
+- a local-first company runtime
+- an agent registry
+- a project registry
+- a task graph with handoff, review, and consultation
+- a memory layer
+- a web and mobile-friendly control surface
+- optional sync and external channels later
 
-In other words: this repo helps you build a company made of projects, roles, workflows, and issue-driven execution.
+In other words: the goal is to let a user run a company of AI workers, not just wire a set of automations together.
 
-## How It Works
+## Current Foundation
 
-Comphony wires together five layers:
+The current repo still contains strong Symphony-based operating assets:
 
 - `Linear`
-  - the task system
-  - where work is requested and tracked
+  - task tracking and project lanes
 - `Symphony`
-  - the orchestrator
-  - watches Linear and starts work
+  - orchestration prototype
 - `Codex`
-  - the execution agent
-  - reads the docs, creates setup files, and performs the work
+  - execution layer
 - `Workflows`
-  - define which Linear project to watch
-  - define which role to play
-  - define which repo to prepare and how
+  - role/lane behavior
 - `Workspaces`
-  - isolated issue-specific folders where actual work happens
+  - issue execution directories
 
 ```mermaid
 flowchart LR
@@ -61,40 +47,41 @@ flowchart LR
     E --> F["Code change, report, or handoff"]
 ```
 
-## The Company Model
+Those pieces are still useful, but they are now part of a bigger product direction.
 
-The recommended operating model is simple and scalable:
+## Target Product Model
+
+The intended product looks more like this:
 
 ```mermaid
 flowchart TD
-    U["User"] --> D["Comphony Desk"]
-    D --> I["Idea Lab"]
-    D --> P["Project Managing"]
-    D --> C["Product - Alpha"]
-    D --> O["Ops / Maintenance"]
-    P --> C
-    C --> E["Research / Design / Dev relay"]
+    U["User"] --> C["Comphony"]
+    C --> A["Agents"]
+    C --> P["Projects"]
+    C --> T["Tasks / Handoffs / Reviews"]
+    C --> M["Memory"]
+    A --> T
+    P --> T
+    T --> C
 ```
 
-That means:
+That means the user experience should become:
 
-- people talk to `Comphony Desk`
-- ideas start in `Idea Lab`
-- setup and provisioning move into `Project Managing`
-- new products get their own Linear projects, repos, and workflows
-- day-to-day execution happens in product-specific lanes
-- final reporting can be pulled back into the Desk parent issue
-
-This gives you a structure that feels closer to an actual company than a single automation script.
+- talk to one company
+- let the company route the work
+- inspect who is doing what
+- interrupt and redirect tasks
+- talk directly to specific agents when needed
+- ask about previous work and decisions
 
 ## One-Shot Setup With Codex
 
-You should be able to clone this repo and simply say:
+You should still be able to clone this repo and simply say:
 
 ```text
 Read this repo and set it up for me.
 Create any missing local setup files yourself, including MISSION.md.
-Keep going until Linear + Symphony is working end-to-end.
+Keep going until Comphony is working end-to-end.
 ```
 
 From there, Codex is expected to:
@@ -102,12 +89,13 @@ From there, Codex is expected to:
 1. read `AGENTS.md` and the setup docs
 2. create `MISSION.md` automatically if it does not exist
 3. prepare the local directory layout
-4. connect Symphony to Linear
-5. create the required Linear projects and states
-6. generate runnable workflow files
-7. verify the system with a smoke test issue
+4. set up the current runtime foundations
+5. connect the relevant systems
+6. generate runnable local assets
+7. verify the system with smoke tests
 
-The goal is not to stop at explanation. The goal is to reach a working state where you can create a Linear issue and watch execution start.
+The goal is not just to explain the system.
+The goal is to reach a working company runtime.
 
 ## Repository Layout
 
@@ -137,13 +125,6 @@ What each folder means:
   - issue-specific working directories
 - `workflows/`
   - real runnable workflow files for the local machine
-
-Naming matters:
-
-- use `repos` for source repos
-- use `workspaces` for isolated issue execution
-- use `workflows` for runnable setup files
-- keep `projects` as a Linear concept, not a filesystem folder name
 
 ## Local-Only State Stays Local
 
@@ -179,18 +160,19 @@ The local environment template is tracked as [.env.example](.env.example), while
 
 ## Start Here
 
-- [Start With Codex](docs/START_WITH_CODEX.md)
-- [Local Layout](docs/LOCAL_LAYOUT.md)
-- [Symphony Basics](docs/SYMPHONY_BASICS.md)
-- [UI UX Pro Max Guide](docs/UI_UX_PRO_MAX_GUIDE.md)
+- [Purpose And Vision](docs/COMPHONY_PURPOSE_AND_VISION.md)
+- [User Experience](docs/COMPHONY_USER_EXPERIENCE.md)
+- [Final Architecture](docs/COMPHONY_FINAL_ARCHITECTURE.md)
+- [System Architecture](docs/COMPHONY_SYSTEM_ARCHITECTURE.md)
+- [Data Model](docs/COMPHONY_DATA_MODEL.md)
+- [UI Information Architecture](docs/COMPHONY_UI_INFORMATION_ARCHITECTURE.md)
+- [MVP And Development](docs/COMPHONY_MVP_AND_DEVELOPMENT.md)
 - [Operating-Level Development Plan](docs/OPERATING_LEVEL_DEVELOPMENT_PLAN.md)
 - [Comphony Desk Model](docs/COMPHONY_DESK_MODEL.md)
 - [Comphony Company Model](docs/COMPHONY_COMPANY_MODEL.md)
-- [Scenario Matrix](docs/SCENARIO_MATRIX.md)
-- [Issue Lifecycle](docs/ISSUE_LIFECYCLE.md)
-- [Workflow Parts](docs/WORKFLOW_PARTS.md)
+- [UI UX Pro Max Guide](docs/UI_UX_PRO_MAX_GUIDE.md)
 - [Setup Test Flow](tests/README.md)
 
 ## In One Sentence
 
-Comphony is a repo for building an AI company with Symphony, then using Codex to set up the whole operating system end-to-end.
+Comphony is a local-first operating system for running a company of AI agents through one conversational front door.
