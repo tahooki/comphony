@@ -254,6 +254,7 @@ Browser workflow example:
 - select a thread from the left column
 - continue the selected thread from chat without manually stepping each workflow transition
 - send a follow-up question in the selected thread, including `@agent` messages
+- ask `Comphony` to keep going, create a project, or hire an agent from chat
 - inspect the task graph, people, projects, and memory views
 - use Advanced Mode only when you want to intervene directly in low-level operations
 - use Advanced Mode to mirror a task out to Linear with `Sync Linear`

@@ -279,7 +279,7 @@ function handleRequest(
     void handlePostJson(request, response, async (payload) => {
       requireActorForMutation(request, config, state, "operator");
       const before = state.events.length;
-      const result = respondToThread(config, state, {
+      const result = respondToThread(config, root, state, {
         threadId: stringField(payload, "threadId"),
         body: stringField(payload, "body")
       });

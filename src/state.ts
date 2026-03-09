@@ -175,6 +175,12 @@ export type PeopleOverview = {
   activeTaskCount: number;
   blockedTaskCount: number;
   currentTaskIds: string[];
+  currentTaskTitles: string[];
+  consultationCount: number;
+  reviewCount: number;
+  sourceKind: string | null;
+  sourceRef: string | null;
+  availability: "available" | "busy" | "blocked";
   trustState: RuntimeAgent["trustState"];
 };
 
@@ -189,6 +195,9 @@ export type ProjectOverview = {
   blockedTaskCount: number;
   openThreadCount: number;
   latestArtifactPath: string | null;
+  currentTaskTitles: string[];
+  latestThreadTitle: string | null;
+  health: "healthy" | "active" | "blocked";
 };
 
 export type ContinueThreadResult = {
@@ -346,6 +355,8 @@ export function listAgents(state: RuntimeState, projectId?: string): RuntimeAgen
 export function listPeopleOverview(state: RuntimeState): PeopleOverview[] {
   return state.agents.map((agent) => {
     const currentTasks = state.tasks.filter((task) => task.assigneeId === agent.id && !isTaskComplete(task));
+    const consultationCount = state.consultations.filter((item) => item.toAgentId === agent.id && item.status === "requested").length;
+    const reviewCount = state.reviews.filter((item) => item.reviewerAgentId === agent.id && item.status === "requested").length;
     return {
       id: agent.id,
       name: agent.name,
@@ -354,6 +365,16 @@ export function listPeopleOverview(state: RuntimeState): PeopleOverview[] {
       activeTaskCount: currentTasks.length,
       blockedTaskCount: currentTasks.filter((task) => isTaskBlocked(task)).length,
       currentTaskIds: currentTasks.map((task) => task.id),
+      currentTaskTitles: currentTasks.map((task) => task.title),
+      consultationCount,
+      reviewCount,
+      sourceKind: agent.sourceKind,
+      sourceRef: agent.sourceRef,
+      availability: currentTasks.some((task) => isTaskBlocked(task))
+        ? "blocked"
+        : currentTasks.length > 0 || consultationCount > 0 || reviewCount > 0
+          ? "busy"
+          : "available",
       trustState: agent.trustState
     };
   });
@@ -362,6 +383,7 @@ export function listPeopleOverview(state: RuntimeState): PeopleOverview[] {
 export function listProjectOverview(state: RuntimeState): ProjectOverview[] {
   return state.projects.map((project) => {
     const projectTasks = state.tasks.filter((task) => task.projectId === project.id);
+    const projectThreads = state.threads.filter((thread) => thread.taskIds.some((taskId) => projectTasks.some((task) => task.id === taskId)));
     const latestArtifactPath = projectTasks
       .flatMap((task) => task.artifactPaths.map((path) => ({ path, updatedAt: task.updatedAt })))
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0]?.path ?? null;
@@ -374,8 +396,20 @@ export function listProjectOverview(state: RuntimeState): ProjectOverview[] {
       agentIds: state.agents.filter((agent) => agent.assignedProjects.includes(project.id)).map((agent) => agent.id),
       activeTaskCount: projectTasks.filter((task) => !isTaskComplete(task)).length,
       blockedTaskCount: projectTasks.filter((task) => isTaskBlocked(task)).length,
-      openThreadCount: state.threads.filter((thread) => thread.taskIds.some((taskId) => projectTasks.some((task) => task.id === taskId))).length,
-      latestArtifactPath
+      openThreadCount: projectThreads.length,
+      latestArtifactPath,
+      currentTaskTitles: projectTasks
+        .filter((task) => !isTaskComplete(task))
+        .slice()
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+        .slice(0, 4)
+        .map((task) => task.title),
+      latestThreadTitle: projectThreads.slice().sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0]?.title ?? null,
+      health: projectTasks.some((task) => isTaskBlocked(task))
+        ? "blocked"
+        : projectTasks.some((task) => !isTaskComplete(task))
+          ? "active"
+          : "healthy"
     };
   });
 }
@@ -885,7 +919,7 @@ export function ingestConnectorMessage(
   ensureConnectorEnabled(config, input.provider);
   const label = input.senderName?.trim() || input.senderId;
   if (input.threadId) {
-    const response = respondToThread(config, state, {
+    const response = respondToThread(config, root, state, {
       threadId: input.threadId,
       body: input.body
     });
@@ -1035,6 +1069,7 @@ export function addMemory(
 
 export function respondToThread(
   config: JSONObject,
+  root: string,
   state: RuntimeState,
   input: { threadId: string; body: string }
 ): { threadId: string; userMessage: MessageRecord; responseMessage: MessageRecord } {
@@ -1059,11 +1094,27 @@ export function respondToThread(
   });
   const targetedAgentId = userMessage.targetAgentId;
   const targetedAgent = targetedAgentId ? state.agents.find((agent) => agent.id === targetedAgentId) ?? null : null;
+  const directAction = !targetedAgent ? resolveConversationAction(config, state, detail, input.body) : null;
   const responseMessage = addMessage(state, {
     threadId: thread.id,
     role: targetedAgent ? "agent" : "system",
     body: targetedAgent
       ? composeAgentDirectedReply(state, targetedAgent, detail, input.body)
+      : directAction?.kind === "continue_loop"
+        ? composeContinueLoopReply(continueThreadUntilPause(config, root, state, { threadId: thread.id }))
+        : directAction?.kind === "create_project"
+          ? composeProjectCreationReply(createProject(state, directAction.project))
+          : directAction?.kind === "install_agent"
+            ? composeAgentInstallReply(
+                installAndMaybeAssignAgent(state, root, {
+                  sourceKind: directAction.sourceKind,
+                  ref: directAction.ref,
+                  trustState: directAction.trustState,
+                  projectId: directAction.assignProjectId
+                })
+              )
+            : directAction?.kind === "people_summary"
+              ? composePeopleSummaryReply(listPeopleOverview(state))
       : composeManagerThreadReply(
         detail,
         input.body,
@@ -2376,6 +2427,143 @@ function resolveMentionedAgentId(state: RuntimeState, body: string): string | nu
   return null;
 }
 
+function resolveConversationAction(
+  config: JSONObject,
+  state: RuntimeState,
+  detail: ThreadDetail,
+  body: string
+):
+  | { kind: "continue_loop" }
+  | { kind: "create_project"; project: { id: string; name: string; purpose?: string; lanes: string[]; repoSlug?: string | null } }
+  | { kind: "install_agent"; sourceKind: "local_package" | "registry_package"; ref: string; trustState?: "trusted" | "restricted" | "quarantined"; assignProjectId?: string }
+  | { kind: "people_summary" }
+  | null {
+  const lowered = body.toLowerCase();
+  if (/(who('| i)?s working|who is busy|who is free|team status|people status)/u.test(lowered)) {
+    return { kind: "people_summary" };
+  }
+  if (/(continue|keep going|move forward|proceed|finish this|run the company|drive this)/u.test(lowered)) {
+    return { kind: "continue_loop" };
+  }
+
+  const projectMatch = body.match(/(?:create|open|start|bootstrap)\s+(?:a\s+)?project(?:\s+called)?\s+["']?([^"'\n]+?)["']?(?:[.!?]|$)/iu);
+  if (projectMatch) {
+    const rawName = projectMatch[1]?.trim();
+    if (rawName) {
+      const normalizedId = slugifyProjectId(rawName);
+      const repoSlug = slugifyRepoSlug(rawName);
+      return {
+        kind: "create_project",
+        project: {
+          id: normalizedId,
+          name: rawName,
+          purpose: `Created from thread ${detail.thread.id}`,
+          lanes: ["planning", "research", "design", "build", "review"],
+          repoSlug
+        }
+      };
+    }
+  }
+
+  const sourceMatch = body.match(/https?:\/\/\S+|(?:\.\/|\/)[^\s]+/u);
+  if (sourceMatch && /(hire|install|add).*(agent|designer|developer|researcher|publisher|worker)|\b(agent|designer|developer|researcher|publisher)\b.*\b(hire|install|add)\b/iu.test(body)) {
+    const currentProjectId = detail.tasks[0]?.projectId;
+    return {
+      kind: "install_agent",
+      sourceKind: sourceMatch[0].startsWith("http") ? "registry_package" : "local_package",
+      ref: sourceMatch[0],
+      trustState: sourceMatch[0].startsWith("http") ? "restricted" : "trusted",
+      assignProjectId: currentProjectId ?? undefined
+    };
+  }
+
+  void config;
+  return null;
+}
+
+function continueThreadUntilPause(
+  config: JSONObject,
+  root: string,
+  state: RuntimeState,
+  input: { threadId: string; maxSteps?: number }
+): ContinueThreadResult[] {
+  const results: ContinueThreadResult[] = [];
+  const maxSteps = input.maxSteps ?? 8;
+  for (let index = 0; index < maxSteps; index += 1) {
+    const result = continueThread(config, root, state, { threadId: input.threadId });
+    results.push(result);
+    if (["waiting", "blocked", "nothing_to_do"].includes(result.action)) {
+      break;
+    }
+  }
+  return results;
+}
+
+function composeContinueLoopReply(results: ContinueThreadResult[]): string {
+  if (results.length === 0) {
+    return "Comphony did not take any additional action on this thread.";
+  }
+  const lines = ["Comphony continued the thread automatically."];
+  for (const result of results) {
+    lines.push(
+      `- ${result.action}: ${result.task?.title ?? "thread"}${result.task ? ` (${result.task.status})` : ""}`
+    );
+  }
+  const final = results[results.length - 1];
+  if (final?.notes?.length) {
+    lines.push(`Latest note: ${final.notes.join(", ")}`);
+  }
+  return lines.join("\n");
+}
+
+function composeProjectCreationReply(project: RuntimeProject): string {
+  return [
+    `Comphony opened a new project: ${project.name}.`,
+    `Project id: ${project.id}.`,
+    `Lanes: ${project.lanes.join(", ")}.`,
+    `Repo slug: ${project.repoSlug ?? "-"}.`
+  ].join(" ");
+}
+
+function installAndMaybeAssignAgent(
+  state: RuntimeState,
+  root: string,
+  input: { sourceKind: "local_package" | "registry_package"; ref: string; trustState?: "trusted" | "restricted" | "quarantined"; projectId?: string }
+): { agent: RuntimeAgent; assignedProjectId: string | null } {
+  const agent = installAgentPackage(state, root, {
+    sourceKind: input.sourceKind,
+    ref: input.ref,
+    trustState: input.trustState
+  });
+  if (input.projectId) {
+    assignAgentToProject(state, { agentId: agent.id, projectId: input.projectId });
+    return { agent, assignedProjectId: input.projectId };
+  }
+  return { agent, assignedProjectId: null };
+}
+
+function composeAgentInstallReply(result: { agent: RuntimeAgent; assignedProjectId: string | null }): string {
+  return [
+    `Comphony installed ${result.agent.name} (${result.agent.id}) as a ${result.agent.role} agent.`,
+    `Source: ${result.agent.sourceKind ?? "-"} ${result.agent.sourceRef ?? ""}`.trim(),
+    result.assignedProjectId ? `Assigned to project ${result.assignedProjectId}.` : "No project assignment was applied yet."
+  ].join(" ");
+}
+
+function composePeopleSummaryReply(people: PeopleOverview[]): string {
+  if (people.length === 0) {
+    return "Comphony has no registered agents yet.";
+  }
+  const ordered = people.slice().sort((left, right) => {
+    const score = (person: PeopleOverview) => person.activeTaskCount + person.consultationCount + person.reviewCount;
+    return score(right) - score(left);
+  });
+  return [
+    "Current team snapshot:",
+    ...ordered.map((person) => `- ${person.name} (${person.role}) · ${person.availability} · tasks=${person.activeTaskCount} · consultations=${person.consultationCount} · reviews=${person.reviewCount}`)
+  ].join("\n");
+}
+
 function composeAgentDirectedReply(
   state: RuntimeState,
   agent: RuntimeAgent,
@@ -2436,6 +2624,22 @@ function composeManagerThreadReply(
       ? ["Similar tasks:", ...recommendedTasks.map((task) => `- ${task.id}: ${task.title} (${task.lane}, ${task.status})`)]
       : [])
   ].join("\n");
+}
+
+function slugifyProjectId(value: string): string {
+  const normalized = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return normalized || `project_${randomUUID().slice(0, 8)}`;
+}
+
+function slugifyRepoSlug(value: string): string {
+  const normalized = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized || `project-${randomUUID().slice(0, 8)}`;
 }
 
 function capitalizeLane(lane: string): string {

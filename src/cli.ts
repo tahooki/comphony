@@ -1127,7 +1127,7 @@ function runThreadAsk(
 ): number {
   const config = loadOrExit(configPath);
   const state = loadRuntimeState(config, root);
-  const result = respondToThread(config, state, { threadId: command.threadId, body: command.body });
+  const result = respondToThread(config, root, state, { threadId: command.threadId, body: command.body });
   saveRuntimeState(config, root, state);
   console.log(
     `${result.threadId}\tuser=${result.userMessage.id}\tresponse=${result.responseMessage.id}\t${result.responseMessage.body.replace(/\n/g, " | ")}`

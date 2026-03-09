@@ -363,7 +363,7 @@ test("thread ask adds a user follow-up and a Comphony status reply", () => {
     body: "Please redesign the Product - Core dashboard UI and improve the UX."
   });
 
-  const reply = respondToThread(config, state, {
+  const reply = respondToThread(config, root, state, {
     threadId: intake.thread.id,
     body: "What is the current status?"
   });
@@ -387,7 +387,7 @@ test("thread ask can address a specific agent directly", () => {
     body: "Please redesign the Product - Core dashboard UI."
   });
 
-  const reply = respondToThread(config, state, {
+  const reply = respondToThread(config, root, state, {
     threadId: intake.thread.id,
     body: "@design_planner_01 what are you doing now?"
   });
@@ -395,6 +395,85 @@ test("thread ask can address a specific agent directly", () => {
   assert.equal(reply.responseMessage.role, "agent");
   assert.equal(reply.responseMessage.targetAgentId, "design_planner_01");
   assert.equal(reply.responseMessage.body.toLowerCase().includes("design"), true);
+});
+
+test("thread ask can continue work autonomously through Comphony", () => {
+  const tempRoot = mkdtempSync(resolve(tmpdir(), "comphony-chat-continue-"));
+  writeFileSync(resolve(tempRoot, "company.yaml"), DEFAULT_COMPANY_YAML, "utf8");
+  mkdirSync(resolve(tempRoot, "runtime-data"), { recursive: true });
+  ["desk_coordinator", "product_dev_01", "design_planner_01", "frontend_publisher_01"].forEach((agentId) => {
+    mkdirSync(resolve(tempRoot, "agents", agentId, "prompts"), { recursive: true });
+    const sourceRoot = resolve(root, "agents", agentId);
+    const targetRoot = resolve(tempRoot, "agents", agentId);
+    writeFileSync(resolve(targetRoot, "agent.yaml"), readFileSync(resolve(sourceRoot, "agent.yaml"), "utf8"), "utf8");
+    writeFileSync(resolve(targetRoot, "prompts", "system.md"), readFileSync(resolve(sourceRoot, "prompts", "system.md"), "utf8"), "utf8");
+  });
+  const config = loadCompanyConfig(resolve(tempRoot, "company.yaml"));
+  const state = loadRuntimeState(config, tempRoot);
+  const intake = intakeRequest(config, tempRoot, state, {
+    title: "Autonomous dashboard refresh",
+    body: "Please redesign the Product - Core dashboard UI, implement it, and review it."
+  });
+
+  const reply = respondToThread(config, tempRoot, state, {
+    threadId: intake.thread.id,
+    body: "keep going until you need me"
+  });
+
+  assert.equal(reply.responseMessage.body.includes("Comphony continued the thread automatically."), true);
+  assert.equal(getThreadDetail(state, intake.thread.id).tasks.length >= 3, true);
+});
+
+test("thread ask can create a project from chat", () => {
+  const config = loadCompanyConfig(resolve(root, "company.yaml"));
+  const state = loadRuntimeState(config, root);
+  const intake = intakeRequest(config, root, state, {
+    title: "Set up next product",
+    body: "We should open a new initiative."
+  });
+
+  const reply = respondToThread(config, root, state, {
+    threadId: intake.thread.id,
+    body: "create project called Customer Portal"
+  });
+
+  assert.equal(reply.responseMessage.body.includes("Comphony opened a new project"), true);
+  assert.equal(listProjects(state).some((project) => project.id === "customer_portal"), true);
+});
+
+test("thread ask can hire an agent from chat", () => {
+  const tempRoot = mkdtempSync(resolve(tmpdir(), "comphony-chat-hire-"));
+  writeFileSync(resolve(tempRoot, "company.yaml"), DEFAULT_COMPANY_YAML, "utf8");
+  mkdirSync(resolve(tempRoot, "runtime-data"), { recursive: true });
+  mkdirSync(resolve(tempRoot, "agents", "research_helper_01", "prompts"), { recursive: true });
+  writeFileSync(resolve(tempRoot, "agents", "research_helper_01", "agent.yaml"), [
+    "id: research_helper_01",
+    "name: Research Helper",
+    "role: research",
+    "assigned_projects: []"
+  ].join("\n"), "utf8");
+  writeFileSync(resolve(tempRoot, "agents", "research_helper_01", "prompts", "system.md"), "You are a research helper.", "utf8");
+  ["desk_coordinator", "product_dev_01", "design_planner_01", "frontend_publisher_01"].forEach((agentId) => {
+    mkdirSync(resolve(tempRoot, "agents", agentId, "prompts"), { recursive: true });
+    const sourceRoot = resolve(root, "agents", agentId);
+    const targetRoot = resolve(tempRoot, "agents", agentId);
+    writeFileSync(resolve(targetRoot, "agent.yaml"), readFileSync(resolve(sourceRoot, "agent.yaml"), "utf8"), "utf8");
+    writeFileSync(resolve(targetRoot, "prompts", "system.md"), readFileSync(resolve(sourceRoot, "prompts", "system.md"), "utf8"), "utf8");
+  });
+  const config = loadCompanyConfig(resolve(tempRoot, "company.yaml"));
+  const state = loadRuntimeState(config, tempRoot);
+  const intake = intakeRequest(config, tempRoot, state, {
+    title: "Need more research support",
+    body: "Please research dashboard patterns for Product - Core."
+  });
+
+  const reply = respondToThread(config, tempRoot, state, {
+    threadId: intake.thread.id,
+    body: "hire agent ./agents/research_helper_01"
+  });
+
+  assert.equal(reply.responseMessage.body.includes("Research Helper"), true);
+  assert.equal(listAgents(state).some((agent) => agent.id === "research_helper_01"), true);
 });
 
 test("thread continue can auto-run assignment, work, and review loop", () => {
@@ -439,7 +518,7 @@ test("memory recommendation ranks thread-related memories first", () => {
     title: "Need related memory",
     body: "Please redesign the Product - Core dashboard UI and improve the UX."
   });
-  respondToThread(config, state, {
+  respondToThread(config, root, state, {
     threadId: intake.thread.id,
     body: "What is the current status?"
   });
@@ -1029,4 +1108,7 @@ test("web app html includes chat, people, projects, and advanced controls", () =
   assert.equal(html.includes("Sync Linear"), true);
   assert.equal(html.includes("People"), true);
   assert.equal(html.includes("Projects"), true);
+  assert.equal(html.includes("Hire Agent"), true);
+  assert.equal(html.includes("Create Project"), true);
+  assert.equal(html.includes("Agent Catalog"), true);
 });

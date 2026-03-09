@@ -399,6 +399,7 @@ export function renderWebAppHtml(): string {
                 <div class="stack">
                   <section>
                     <div class="section-head"><h3>Task Graph</h3></div>
+                    <div id="chat-graph-summary" style="margin-bottom: 10px;"></div>
                     <div class="stack" id="chat-tasks"></div>
                   </section>
                   <section>
@@ -422,7 +423,22 @@ export function renderWebAppHtml(): string {
                 <h2>People</h2>
                 <span class="chip">Who exists, what they do, and what they carry</span>
               </div>
-              <div class="three-col" id="people-view"></div>
+              <div class="two-col">
+                <section class="stack">
+                  <form class="composer card advanced-only block" id="agent-install-form">
+                    <input id="agent-install-ref" placeholder="Agent package URL or local path" value="https://registry.example.com/agents/remote-designer" />
+                    <div class="actions">
+                      <button type="submit">Hire Agent</button>
+                      <button class="secondary" type="button" id="agent-install-local">Use Local Example</button>
+                    </div>
+                  </form>
+                  <div class="three-col" id="people-view"></div>
+                </section>
+                <section class="stack">
+                  <div class="section-head"><h3>Agent Catalog</h3></div>
+                  <div class="stack" id="agent-catalog-view"></div>
+                </section>
+              </div>
             </section>
 
             <section class="view" id="view-projects">
@@ -430,7 +446,22 @@ export function renderWebAppHtml(): string {
                 <h2>Projects</h2>
                 <span class="chip">Products, staffing, lanes, and delivery health</span>
               </div>
-              <div class="three-col" id="projects-view"></div>
+              <div class="two-col">
+                <section class="stack">
+                  <form class="composer card advanced-only block" id="project-create-form">
+                    <input id="project-create-name" placeholder="Project name" value="Customer Portal" />
+                    <input id="project-create-purpose" placeholder="Purpose" value="New product initiative created from Comphony chat" />
+                    <div class="actions">
+                      <button type="submit">Create Project</button>
+                    </div>
+                  </form>
+                  <div class="three-col" id="projects-view"></div>
+                </section>
+                <section class="stack">
+                  <div class="section-head"><h3>Portfolio Health</h3></div>
+                  <div class="stack" id="project-portfolio-view"></div>
+                </section>
+              </div>
             </section>
 
             <section class="view" id="view-memory">
@@ -462,6 +493,7 @@ export function renderWebAppHtml(): string {
         projects: [],
         projectOverview: [],
         agents: [],
+        agentCatalog: [],
         people: [],
         threads: [],
         tasks: [],
@@ -476,11 +508,14 @@ export function renderWebAppHtml(): string {
       const threadList = document.getElementById("thread-list");
       const chatSummary = document.getElementById("chat-summary");
       const chatMessages = document.getElementById("chat-messages");
+      const chatGraphSummary = document.getElementById("chat-graph-summary");
       const chatTasks = document.getElementById("chat-tasks");
       const chatCoordination = document.getElementById("chat-coordination");
       const workView = document.getElementById("work-view");
       const peopleView = document.getElementById("people-view");
+      const agentCatalogView = document.getElementById("agent-catalog-view");
       const projectsView = document.getElementById("projects-view");
+      const projectPortfolioView = document.getElementById("project-portfolio-view");
       const memoryList = document.getElementById("memory-list");
       const similarTaskList = document.getElementById("similar-task-list");
       const eventList = document.getElementById("event-list");
@@ -622,10 +657,31 @@ export function renderWebAppHtml(): string {
         chatCoordination.innerHTML = items.join("") || '<div class="empty">No active consultations, reviews, or approvals on this thread.</div>';
       }
 
+      function renderGraphSummary(detail) {
+        const parent = detail.tasks.find((task) => !task.parentTaskId) || null;
+        const children = detail.tasks.filter((task) => task.parentTaskId);
+        if (!parent) {
+          chatGraphSummary.innerHTML = '<div class="empty">No task graph summary yet.</div>';
+          return;
+        }
+        const laneTrail = children.map((task) => \`\${escapeHtml(task.lane)}:\${escapeHtml(task.status)}\`).join(" → ");
+        const completed = children.filter((task) => taskComplete(task)).length;
+        chatGraphSummary.innerHTML = \`<article class="info-card">
+          <header>
+            <strong>Root Request</strong>
+            <span class="meta">\${escapeHtml(parent.status)}</span>
+          </header>
+          <div class="meta">children: \${children.length} · completed: \${completed}</div>
+          <div class="meta">flow: \${laneTrail || "-"}</div>
+          \${parent.completionSummary ? \`<div class="meta">summary: \${escapeHtml(parent.completionSummary)}</div>\` : ""}
+        </article>\`;
+      }
+
       function renderChatView() {
         const detail = state.selectedThreadDetail;
         if (!detail) {
           chatSummary.innerHTML = '<div class="empty">Select a thread to see what Comphony is doing.</div>';
+          chatGraphSummary.innerHTML = "";
           chatMessages.innerHTML = "";
           chatTasks.innerHTML = "";
           chatCoordination.innerHTML = "";
@@ -643,6 +699,7 @@ export function renderWebAppHtml(): string {
           \${currentTask ? \`<div class="meta">current focus: \${escapeHtml(currentTask.title)} · \${escapeHtml(currentTask.status)} · \${escapeHtml(currentTask.assigneeId || "unassigned")}</div>\` : '<div class="meta">No active task.</div>'}
         </article>\`;
 
+        renderGraphSummary(detail);
         chatMessages.innerHTML = detail.messages.map(renderMessage).join("") || '<div class="empty">No messages yet.</div>';
         chatTasks.innerHTML = detail.tasks
           .slice()
@@ -678,27 +735,56 @@ export function renderWebAppHtml(): string {
       function renderPeopleView() {
         peopleView.innerHTML = state.people.map((person) => \`<article class="info-card">
           <header>
-            <strong>\${escapeHtml(person.id)}</strong>
-            <span class="meta">\${escapeHtml(person.role)}</span>
+            <strong>\${escapeHtml(person.name)}</strong>
+            <span class="meta">\${escapeHtml(person.role)} · \${escapeHtml(person.availability)}</span>
           </header>
+          <div class="meta"><code>\${escapeHtml(person.id)}</code></div>
           <div class="meta">projects: \${escapeHtml(person.assignedProjects.join(", ") || "-")}</div>
           <div class="meta">active tasks: \${person.activeTaskCount} · blocked: \${person.blockedTaskCount}</div>
+          <div class="meta">consultations: \${person.consultationCount} · reviews: \${person.reviewCount}</div>
           <div class="meta">trust: \${escapeHtml(person.trustState)}</div>
-          <div class="meta">current: \${escapeHtml(person.currentTaskIds.join(", ") || "-")}</div>
+          <div class="meta">source: \${escapeHtml(person.sourceKind || "-")}</div>
+          <div class="meta">current: \${escapeHtml(person.currentTaskTitles.join(" · ") || "-")}</div>
+          <div class="actions">
+            <button type="button" class="secondary" data-action="mention-agent" data-agent-id="\${escapeHtml(person.id)}">Talk To Agent</button>
+          </div>
         </article>\`).join("") || '<div class="empty">No registered people yet.</div>';
+
+        agentCatalogView.innerHTML = state.agentCatalog.map((agent) => \`<article class="info-card">
+          <header>
+            <strong>\${escapeHtml(agent.name)}</strong>
+            <span class="meta">\${escapeHtml(agent.role)}</span>
+          </header>
+          <div class="meta"><code>\${escapeHtml(agent.id)}</code></div>
+          <div class="meta">source: \${escapeHtml(agent.sourceKind || "-")} · trust: \${escapeHtml(agent.trustState)}</div>
+          <div class="meta">projects: \${escapeHtml(agent.assignedProjects.join(", ") || "-")}</div>
+          <div class="meta">cached: \${escapeHtml(agent.cachedPath || "-")}</div>
+        </article>\`).join("") || '<div class="empty">No installed agent packages yet.</div>';
       }
 
       function renderProjectsView() {
         projectsView.innerHTML = state.projectOverview.map((project) => \`<article class="info-card">
           <header>
             <strong>\${escapeHtml(project.name)}</strong>
-            <span class="meta">\${escapeHtml(project.id)}</span>
+            <span class="meta">\${escapeHtml(project.id)} · \${escapeHtml(project.health)}</span>
           </header>
           <div class="meta">active: \${project.activeTaskCount} · blocked: \${project.blockedTaskCount}</div>
           <div class="meta">threads: \${project.openThreadCount} · agents: \${project.agentIds.length}</div>
           <div class="meta">lanes: \${escapeHtml(project.lanes.join(", "))}</div>
+          <div class="meta">current work: \${escapeHtml(project.currentTaskTitles.join(" · ") || "-")}</div>
+          <div class="meta">latest thread: \${escapeHtml(project.latestThreadTitle || "-")}</div>
           <div class="meta">latest artifact: \${escapeHtml(project.latestArtifactPath || "-")}</div>
         </article>\`).join("") || '<div class="empty">No projects yet.</div>';
+
+        projectPortfolioView.innerHTML = state.projectOverview.map((project) => \`<article class="info-card">
+          <header>
+            <strong>\${escapeHtml(project.name)}</strong>
+            <span class="meta">\${escapeHtml(project.health)}</span>
+          </header>
+          <div class="meta">repo: \${escapeHtml(project.repoSlug || "-")}</div>
+          <div class="meta">staffed with: \${escapeHtml(project.agentIds.join(", ") || "-")}</div>
+          <div class="meta">portfolio view: \${project.blockedTaskCount > 0 ? "needs help" : project.activeTaskCount > 0 ? "moving" : "quiet"}</div>
+        </article>\`).join("") || '<div class="empty">No portfolio summary yet.</div>';
       }
 
       function renderMemoryView() {
@@ -775,10 +861,11 @@ export function renderWebAppHtml(): string {
       }
 
       async function refreshSnapshots() {
-        const [projectsRes, projectOverviewRes, agentsRes, peopleRes, threadsRes, tasksRes, eventsRes] = await Promise.all([
+        const [projectsRes, projectOverviewRes, agentsRes, agentCatalogRes, peopleRes, threadsRes, tasksRes, eventsRes] = await Promise.all([
           fetch("/v1/projects"),
           fetch("/v1/projects/overview"),
           fetch("/v1/agents"),
+          fetch("/v1/agents/catalog"),
           fetch("/v1/people"),
           fetch("/v1/threads"),
           fetch("/v1/tasks"),
@@ -787,6 +874,7 @@ export function renderWebAppHtml(): string {
         state.projects = (await projectsRes.json()).projects;
         state.projectOverview = (await projectOverviewRes.json()).projects;
         state.agents = (await agentsRes.json()).agents;
+        state.agentCatalog = (await agentCatalogRes.json()).agents;
         state.people = (await peopleRes.json()).people;
         state.threads = (await threadsRes.json()).threads;
         state.tasks = (await tasksRes.json()).tasks;
@@ -848,6 +936,10 @@ export function renderWebAppHtml(): string {
         await refreshSnapshots();
       });
 
+      document.getElementById("agent-install-local").addEventListener("click", () => {
+        document.getElementById("agent-install-ref").value = "./agents/design_planner_01";
+      });
+
       threadList.addEventListener("click", async (event) => {
         const card = event.target.closest("[data-thread-id]");
         if (!card) {
@@ -873,12 +965,68 @@ export function renderWebAppHtml(): string {
         await refreshSnapshots();
       });
 
+      document.getElementById("agent-install-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const ref = document.getElementById("agent-install-ref").value.trim();
+        if (!ref) {
+          return;
+        }
+        const sourceKind = ref.startsWith("http") ? "registry_package" : "local_package";
+        const result = await postJson("/v1/agents/install", {
+          sourceKind,
+          ref,
+          trustState: sourceKind === "registry_package" ? "restricted" : "trusted"
+        });
+        const currentProjectId = state.selectedThreadDetail?.tasks[0]?.projectId;
+        if (currentProjectId && result.agent?.id) {
+          await postJson("/v1/agents/assign-project", {
+            agentId: result.agent.id,
+            projectId: currentProjectId
+          });
+        }
+        await refreshSnapshots();
+      });
+
+      document.getElementById("project-create-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const name = document.getElementById("project-create-name").value.trim();
+        const purpose = document.getElementById("project-create-purpose").value.trim();
+        if (!name) {
+          return;
+        }
+        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+        const repoSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+        await postJson("/v1/projects", {
+          id: id || ("project_" + Date.now()),
+          name,
+          purpose,
+          repoSlug: repoSlug || null,
+          lanes: ["planning", "research", "design", "build", "review"]
+        });
+        await refreshSnapshots();
+      });
+
       document.getElementById("continue-thread").addEventListener("click", async () => {
         if (!state.selectedThreadId) {
           return;
         }
         await postJson("/v1/threads/continue", { threadId: state.selectedThreadId });
         await refreshSnapshots();
+      });
+
+      peopleView.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-action='mention-agent']");
+        if (!button) {
+          return;
+        }
+        const agentId = button.getAttribute("data-agent-id");
+        const input = document.getElementById("thread-reply-input");
+        input.value = \`@\${agentId} what are you doing and what do you need next?\`;
+        state.currentView = "chat";
+        document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab.getAttribute("data-view") === "chat"));
+        document.querySelectorAll(".view").forEach((view) => {
+          view.classList.toggle("active", view.id === "view-chat");
+        });
       });
 
       chatTasks.addEventListener("click", async (event) => {
