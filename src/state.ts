@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -6,6 +5,14 @@ import YAML from "yaml";
 
 import type { JSONObject, RoutingPolicy } from "./config.js";
 import { resolveRoutingPolicy } from "./config.js";
+import {
+  createLinearIssue,
+  fetchLinearProjectId,
+  fetchLinearTeamId,
+  getProjectSyncName,
+  updateLinearIssue
+} from "./integrations/linear.js";
+import { syncRuntimeToSupabase as pushRuntimeSnapshotToSupabase } from "./integrations/supabase.js";
 import {
   addMessage as addThreadDomainMessage,
   createThread as createThreadRecord,
@@ -34,6 +41,21 @@ import {
   getOrderedThreadTasks as getOrderedTasksForThread,
   workTurnMessage as composeWorkTurnMessage
 } from "./state/task-workflow-helpers.js";
+import {
+  asMap,
+  composeLinearIssuePayload,
+  ensureConnectorEnabled,
+  ensureExternalSyncApproval,
+  findAgent,
+  findTask,
+  findThreadByTask,
+  getRuntimeDataDir,
+  getStatePath,
+  getSyncProviderConfig,
+  loadAgentPackageSource,
+  syncCatalogFromConfig,
+  upsertTaskExternalRef
+} from "./state/runtime-support.js";
 import {
   autoReviewTarget as findAutoReviewTarget,
   isTaskAwaitingConsultation,
@@ -390,7 +412,7 @@ export function loadRuntimeState(config: JSONObject, root: string): RuntimeState
     state = structuredClone(DEFAULT_STATE);
   }
 
-  const synced = syncCatalogFromConfig(config, state);
+  const synced = syncCatalogFromConfig(config, state) as RuntimeState;
   saveRuntimeState(config, root, synced);
   return synced;
 }
@@ -1458,136 +1480,6 @@ function capitalizeLane(lane: string): string {
   return lane.length > 0 ? `${lane[0].toUpperCase()}${lane.slice(1)}` : lane;
 }
 
-function syncCatalogFromConfig(config: JSONObject, state: RuntimeState): RuntimeState {
-  const normalizedMessages = normalizeMessages(state.messages ?? []);
-  const normalizedThreads = normalizeThreads(state.threads ?? [], normalizedMessages);
-  const nextState: RuntimeState = {
-    version: state.version ?? 1,
-    counters: normalizeCounters({
-      ...state,
-      messages: normalizedMessages,
-      threads: normalizedThreads,
-      events: state.events ?? [],
-      memories: state.memories ?? [],
-      consultations: state.consultations ?? [],
-      reviews: state.reviews ?? [],
-      approvals: state.approvals ?? [],
-      syncRecords: state.syncRecords ?? [],
-      sessions: state.sessions ?? []
-    }),
-    tasks: (state.tasks ?? []).map((task) => ({
-      ...task,
-      parentTaskId: typeof task.parentTaskId === "string" ? task.parentTaskId : null,
-      childTaskIds: Array.isArray(task.childTaskIds)
-        ? task.childTaskIds.filter((item: unknown): item is string => typeof item === "string")
-        : [],
-      dependsOnTaskIds: Array.isArray(task.dependsOnTaskIds)
-        ? task.dependsOnTaskIds.filter((item: unknown): item is string => typeof item === "string")
-        : [],
-      artifactPaths: Array.isArray(task.artifactPaths)
-        ? task.artifactPaths.filter((item: unknown): item is string => typeof item === "string")
-        : [],
-      externalRefs: Array.isArray(task.externalRefs)
-        ? task.externalRefs.map((ref) => ({
-          provider: typeof ref?.provider === "string" ? ref.provider : "unknown",
-          externalId: typeof ref?.externalId === "string" ? ref.externalId : null,
-          externalKey: typeof ref?.externalKey === "string" ? ref.externalKey : null,
-          url: typeof ref?.url === "string" ? ref.url : null
-        }))
-        : [],
-      blockingReason: typeof task.blockingReason === "string" ? task.blockingReason : null,
-      needsApproval: Boolean(task.needsApproval),
-      humanTakeover: Boolean(task.humanTakeover),
-      completionSummary: typeof task.completionSummary === "string" ? task.completionSummary : null
-    })),
-    threads: normalizedThreads,
-    messages: normalizedMessages,
-    events: state.events ?? [],
-    memories: (state.memories ?? []).map((memory) => ({
-      ...memory,
-      tags: Array.isArray(memory.tags)
-        ? memory.tags.filter((item: unknown): item is string => typeof item === "string")
-        : []
-    })),
-    consultations: (state.consultations ?? []).map((consultation) => ({
-      ...consultation,
-      response: typeof consultation.response === "string" ? consultation.response : null
-    })),
-    reviews: (state.reviews ?? []).map((review) => ({
-      ...review,
-      notes: typeof review.notes === "string" ? review.notes : null,
-      outcome: review.outcome === "approved" || review.outcome === "changes_requested" ? review.outcome : null
-    })),
-    approvals: (state.approvals ?? []).map((approval) => ({
-      ...approval,
-      taskId: typeof approval.taskId === "string" ? approval.taskId : null,
-      threadId: typeof approval.threadId === "string" ? approval.threadId : null,
-      notes: typeof approval.notes === "string" ? approval.notes : null,
-      resumeStatus: typeof approval.resumeStatus === "string" ? approval.resumeStatus : null
-    })),
-    syncRecords: (state.syncRecords ?? []).map((record) => ({
-      ...record,
-      projectId: typeof record.projectId === "string" ? record.projectId : null,
-      taskId: typeof record.taskId === "string" ? record.taskId : null
-    })),
-    sessions: (state.sessions ?? []).map((session) => ({
-      ...session,
-      label: typeof session.label === "string" ? session.label : null,
-      revokedAt: typeof session.revokedAt === "string" ? session.revokedAt : null
-    })),
-    projects: [],
-    agents: []
-  };
-
-  const configProjects = (Array.isArray(config.projects) ? config.projects : []).flatMap((project) => {
-    const projectMap = asMap(project);
-    if (!projectMap) {
-      return [];
-    }
-    const repo = asMap(projectMap.repo);
-    const lanes = Array.isArray(projectMap.lanes)
-      ? projectMap.lanes.filter((lane): lane is string => typeof lane === "string")
-      : [];
-    return [
-      {
-        id: typeof projectMap.id === "string" ? projectMap.id : "",
-        name: typeof projectMap.name === "string" ? projectMap.name : "",
-        purpose: typeof projectMap.purpose === "string" ? projectMap.purpose : null,
-        lanes,
-        repoSlug: typeof repo?.slug === "string" ? repo.slug : null,
-        source: "config" as const
-      }
-    ];
-  });
-  const runtimeProjects = (state.projects ?? []).filter((project) => !configProjects.some((item) => item.id === project.id));
-  nextState.projects = [...configProjects, ...runtimeProjects];
-
-  const configAgents = (Array.isArray(config.agents) ? config.agents : []).flatMap((agent) => {
-    const agentMap = asMap(agent);
-    if (!agentMap) {
-      return [];
-    }
-    const assignedProjects = Array.isArray(agentMap.assigned_projects)
-      ? agentMap.assigned_projects.filter((projectId): projectId is string => typeof projectId === "string")
-      : [];
-    return [
-      {
-        id: typeof agentMap.id === "string" ? agentMap.id : "",
-        name: typeof agentMap.name === "string" ? agentMap.name : "",
-        role: typeof agentMap.role === "string" ? agentMap.role : "",
-        assignedProjects,
-        sourceKind: typeof asMap(agentMap.source)?.kind === "string" ? String(asMap(agentMap.source)?.kind) : null,
-        sourceRef: typeof asMap(agentMap.source)?.ref === "string" ? String(asMap(agentMap.source)?.ref) : null,
-        trustState: "trusted" as const
-      }
-    ];
-  });
-  const runtimeAgents = (state.agents ?? []).filter((agent) => !configAgents.some((item) => item.id === agent.id));
-  nextState.agents = [...configAgents, ...runtimeAgents];
-
-  return nextState;
-}
-
 function nextTaskId(state: RuntimeState): string {
   state.counters.task += 1;
   return `task_${String(state.counters.task).padStart(4, "0")}`;
@@ -1732,31 +1624,6 @@ function defaultRoutingPolicy(): RoutingPolicy {
   };
 }
 
-function normalizeMessages(messages: MessageRecord[]): MessageRecord[] {
-  return messages.map((message, index) => {
-    const validId = /^msg_\d{4,}$/.test(message.id);
-    return {
-      ...message,
-      id: validId ? message.id : `msg_${String(index + 1).padStart(4, "0")}`,
-      targetAgentId: typeof message.targetAgentId === "string" ? message.targetAgentId : null
-    };
-  });
-}
-
-function normalizeThreads(threads: ThreadRecord[], messages: MessageRecord[]): ThreadRecord[] {
-  const messageIds = new Set(messages.map((message) => message.id));
-  return threads.map((thread) => ({
-    ...thread,
-    messageIds: thread.messageIds.map((messageId, index) => {
-      if (messageIds.has(messageId)) {
-        return messageId;
-      }
-      const fallback = messages.find((message) => message.threadId === thread.id);
-      return fallback?.id ?? `msg_${String(index + 1).padStart(4, "0")}`;
-    })
-  }));
-}
-
 function appendEvent(state: RuntimeState, input: Omit<EventRecord, "id">): EventRecord {
   const event: EventRecord = {
     id: nextEventId(state),
@@ -1766,94 +1633,8 @@ function appendEvent(state: RuntimeState, input: Omit<EventRecord, "id">): Event
   return event;
 }
 
-function getRuntimeDataDir(config: JSONObject, root: string): string {
-  const runtime = asMap(config.runtime);
-  const relative = typeof runtime?.data_dir === "string" ? runtime.data_dir : "./runtime-data";
-  return resolve(root, relative);
-}
-
-function getStatePath(config: JSONObject, root: string): string {
-  return resolve(getRuntimeDataDir(config, root), "state.json");
-}
-
-function loadAgentPackageSource(
-  root: string,
-  input: { sourceKind: "local_package" | "registry_package"; ref: string }
-): { manifestText: string; promptText: string | null; sourceRef: string } {
-  if (input.sourceKind === "local_package") {
-    const basePath = resolve(root, input.ref);
-    return {
-      manifestText: readFileSync(resolve(basePath, "agent.yaml"), "utf8"),
-      promptText: safeReadText(resolve(basePath, "prompts", "system.md")),
-      sourceRef: input.ref
-    };
-  }
-
-  if (isHttpUrl(input.ref)) {
-    const manifestUrl = input.ref.endsWith(".yaml") ? input.ref : `${input.ref.replace(/\/$/, "")}/agent.yaml`;
-    const manifestText = fetchTextSync(manifestUrl);
-    const parsed = YAML.parse(manifestText) as Record<string, unknown>;
-    const entrypoints = asMap(parsed?.entrypoints);
-    const promptPath = typeof entrypoints?.prompt === "string" ? entrypoints.prompt : "prompts/system.md";
-    let promptText: string | null = null;
-    try {
-      promptText = fetchTextSync(joinUrl(dirnameUrl(manifestUrl), promptPath));
-    } catch {
-      promptText = null;
-    }
-    return {
-      manifestText,
-      promptText,
-      sourceRef: manifestUrl
-    };
-  }
-
-  const basePath = resolve(root, input.ref);
-  return {
-    manifestText: readFileSync(resolve(basePath, "agent.yaml"), "utf8"),
-    promptText: safeReadText(resolve(basePath, "prompts", "system.md")),
-    sourceRef: input.ref
-  };
-}
-
-function ensureExternalSyncApproval(
-  config: JSONObject,
-  state: RuntimeState,
-  task: TaskRecord,
-  action: string
-): void {
-  const policies = asMap(config.policies);
-  if (policies?.external_sync_requires_auth !== true) {
-    return;
-  }
-  const latestApproval = [...state.approvals]
-    .reverse()
-    .find((approval) => approval.taskId === task.id && approval.action === action);
-  if (!latestApproval || latestApproval.status !== "granted") {
-    throw new Error(`External sync requires granted approval for task ${task.id}`);
-  }
-}
-
 function findConfiguredActor(config: JSONObject, actorId: string): { id: string; role: string } {
   return findConfiguredSessionActor(config, actorId);
-}
-
-function ensureConnectorEnabled(config: JSONObject, provider: "telegram" | "discord" | "slack"): void {
-  const connectors = asMap(config.connectors);
-  const providerConfig = asMap(connectors?.[provider]);
-  if (providerConfig?.enabled !== true) {
-    throw new Error(`Connector ${provider} is not enabled`);
-  }
-}
-
-function getSyncProviderConfig(config: JSONObject, provider: string): Record<string, unknown> {
-  const sync = asMap(config.sync);
-  const providers = asMap(sync?.providers);
-  const providerConfig = providers ? asMap(providers[provider]) : null;
-  if (!providerConfig || providerConfig.enabled !== true) {
-    throw new Error(`Sync provider ${provider} is not enabled`);
-  }
-  return providerConfig;
 }
 
 function syncRuntimeToSupabase(
@@ -1861,305 +1642,5 @@ function syncRuntimeToSupabase(
   providerConfig: Record<string, unknown>,
   state: RuntimeState
 ): void {
-  const projectRef = typeof providerConfig.project_ref === "string" ? providerConfig.project_ref : "local-dev";
-  const supabaseUrl = process.env.SUPABASE_URL ?? (projectRef !== "local-dev" ? `https://${projectRef}.supabase.co` : undefined);
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set");
-  }
-  const company = asMap(config.company);
-  const companySlug = typeof company?.slug === "string" ? company.slug : "comphony";
-  const snapshotBody = {
-    company_slug: companySlug,
-    project_ref: projectRef,
-    generated_at: new Date().toISOString(),
-    snapshot: {
-      projects: state.projects,
-      agents: state.agents,
-      tasks: state.tasks,
-      threads: state.threads,
-      messages: state.messages.slice(-200),
-      approvals: state.approvals,
-      reviews: state.reviews,
-      consultations: state.consultations,
-      sync_records: state.syncRecords,
-      sessions: state.sessions.map((session) => ({
-        id: session.id,
-        actor_id: session.actorId,
-        role: session.role,
-        label: session.label,
-        created_at: session.createdAt,
-        last_seen_at: session.lastSeenAt,
-        revoked_at: session.revokedAt
-      }))
-    }
-  };
-  fetchTextSync(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/comphony_runtime_snapshots`, {
-    method: "POST",
-    headers: {
-      apikey: serviceRoleKey,
-      Authorization: `Bearer ${serviceRoleKey}`,
-      "Content-Type": "application/json",
-      Prefer: "return=minimal"
-    },
-    body: JSON.stringify(snapshotBody)
-  });
-  const recentEvents = listEvents(state, 50).map((event) => ({
-    company_slug: companySlug,
-    project_ref: projectRef,
-    event_id: event.id,
-    event_type: event.type,
-    entity_type: event.entityType,
-    entity_id: event.entityId,
-    occurred_at: event.timestamp,
-    payload: event.payload
-  }));
-  if (recentEvents.length > 0) {
-    fetchTextSync(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/comphony_events`, {
-      method: "POST",
-      headers: {
-        apikey: serviceRoleKey,
-        Authorization: `Bearer ${serviceRoleKey}`,
-        "Content-Type": "application/json",
-        Prefer: "return=minimal"
-      },
-      body: JSON.stringify(recentEvents)
-    });
-  }
-}
-
-function getProjectSyncName(config: JSONObject, projectId: string): string | null {
-  const projects = Array.isArray(config.projects) ? config.projects : [];
-  const projectConfig = projects.find((item) => asMap(item)?.id === projectId);
-  const trackerSync = asMap(asMap(projectConfig)?.tracker_sync);
-  if (typeof trackerSync?.project_name === "string") {
-    return trackerSync.project_name;
-  }
-  return null;
-}
-
-function composeLinearIssuePayload(task: TaskRecord): { title: string; description: string } {
-  const lines = [
-    task.description.trim() || task.title,
-    "",
-    `Comphony task: ${task.id}`,
-    `Lane: ${task.lane}`,
-    `Status: ${task.status}`,
-    `Assignee: ${task.assigneeId ?? "-"}`,
-    task.parentTaskId ? `Parent task: ${task.parentTaskId}` : "",
-    task.dependsOnTaskIds.length > 0 ? `Depends on: ${task.dependsOnTaskIds.join(", ")}` : "",
-    task.completionSummary ? `Summary: ${task.completionSummary}` : ""
-  ].filter(Boolean);
-  return {
-    title: task.title,
-    description: lines.join("\n")
-  };
-}
-
-function upsertTaskExternalRef(task: TaskRecord, ref: ExternalRefRecord): void {
-  const existingIndex = task.externalRefs.findIndex((item) => item.provider === ref.provider);
-  if (existingIndex === -1) {
-    task.externalRefs.push(ref);
-    return;
-  }
-  task.externalRefs[existingIndex] = ref;
-}
-
-function fetchLinearTeamId(apiKey: string, teamKey: string): string {
-  const data = linearGraphql(apiKey, `
-    query ComphonyTeamByKey($teamKey: String!) {
-      teams(filter: { key: { eq: $teamKey } }) {
-        nodes {
-          id
-          key
-        }
-      }
-    }
-  `, { teamKey });
-  const team = data?.teams?.nodes?.[0];
-  if (!team?.id) {
-    throw new Error(`Linear team with key ${teamKey} was not found`);
-  }
-  return String(team.id);
-}
-
-function fetchLinearProjectId(apiKey: string, projectName: string): string | null {
-  const data = linearGraphql(apiKey, `
-    query ComphonyProjectByName($projectName: String!) {
-      projects(filter: { name: { eq: $projectName } }) {
-        nodes {
-          id
-          name
-        }
-      }
-    }
-  `, { projectName });
-  const project = data?.projects?.nodes?.[0];
-  return project?.id ? String(project.id) : null;
-}
-
-function createLinearIssue(
-  apiKey: string,
-  input: { teamId: string; projectId: string | null; title: string; description: string }
-): { id: string; identifier: string | null; url: string | null } {
-  const data = linearGraphql(apiKey, `
-    mutation ComphonyIssueCreate($input: IssueCreateInput!) {
-      issueCreate(input: $input) {
-        success
-        issue {
-          id
-          identifier
-          url
-        }
-      }
-    }
-  `, {
-    input: {
-      teamId: input.teamId,
-      projectId: input.projectId,
-      title: input.title,
-      description: input.description
-    }
-  });
-  const issue = data?.issueCreate?.issue;
-  if (!issue?.id) {
-    throw new Error("Linear issueCreate did not return an issue id");
-  }
-  return {
-    id: String(issue.id),
-    identifier: issue.identifier ? String(issue.identifier) : null,
-    url: issue.url ? String(issue.url) : null
-  };
-}
-
-function updateLinearIssue(
-  apiKey: string,
-  issueId: string,
-  input: { title: string; description: string }
-): { id: string; identifier: string | null; url: string | null } {
-  const data = linearGraphql(apiKey, `
-    mutation ComphonyIssueUpdate($issueId: String!, $input: IssueUpdateInput!) {
-      issueUpdate(id: $issueId, input: $input) {
-        success
-        issue {
-          id
-          identifier
-          url
-        }
-      }
-    }
-  `, {
-    issueId,
-    input: {
-      title: input.title,
-      description: input.description
-    }
-  });
-  const issue = data?.issueUpdate?.issue;
-  if (!issue?.id) {
-    throw new Error("Linear issueUpdate did not return an issue id");
-  }
-  return {
-    id: String(issue.id),
-    identifier: issue.identifier ? String(issue.identifier) : null,
-    url: issue.url ? String(issue.url) : null
-  };
-}
-
-function linearGraphql(apiKey: string, query: string, variables: Record<string, unknown>): any {
-  const endpoint = process.env.LINEAR_API_URL ?? "https://api.linear.app/graphql";
-  const responseText = fetchTextSync(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: apiKey,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ query, variables })
-  });
-  const parsed = JSON.parse(responseText) as { data?: unknown; errors?: Array<{ message?: string }> };
-  if (parsed.errors && parsed.errors.length > 0) {
-    const message = parsed.errors.map((error) => error.message || "Unknown Linear error").join("; ");
-    throw new Error(message);
-  }
-  return parsed.data;
-}
-
-function fetchTextSync(
-  url: string,
-  options?: {
-    method?: string;
-    headers?: Record<string, string>;
-    body?: string;
-  }
-): string {
-  const script = `
-    const [url, optionsJson] = process.argv.slice(1);
-    const options = optionsJson ? JSON.parse(optionsJson) : {};
-    fetch(url, options).then(async (response) => {
-      const text = await response.text();
-      if (!response.ok) {
-        console.error(text || response.statusText);
-        process.exit(1);
-      }
-      process.stdout.write(text);
-    }).catch((error) => {
-      console.error(error instanceof Error ? error.message : String(error));
-      process.exit(1);
-    });
-  `;
-  return execFileSync(process.execPath, ["-e", script, url, JSON.stringify(options ?? {})], { encoding: "utf8" });
-}
-
-function asMap(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
-}
-
-function safeReadText(path: string): string | null {
-  try {
-    return readFileSync(path, "utf8");
-  } catch {
-    return null;
-  }
-}
-
-function isHttpUrl(value: string): boolean {
-  return value.startsWith("http://") || value.startsWith("https://");
-}
-
-function dirnameUrl(url: string): string {
-  const parsed = new URL(url);
-  const parts = parsed.pathname.split("/").filter(Boolean);
-  parts.pop();
-  parsed.pathname = `/${parts.join("/")}`;
-  return parsed.toString().replace(/\/$/, "");
-}
-
-function joinUrl(base: string, relative: string): string {
-  const cleanBase = base.replace(/\/$/, "");
-  const cleanRelative = relative.replace(/^\.\//, "").replace(/^\//, "");
-  return `${cleanBase}/${cleanRelative}`;
-}
-
-function findTask(state: RuntimeState, taskId: string): TaskRecord {
-  const task = state.tasks.find((item) => item.id === taskId);
-  if (!task) {
-    throw new Error(`Unknown task id: ${taskId}`);
-  }
-  return task;
-}
-
-function findAgent(state: RuntimeState, agentId: string): RuntimeAgent {
-  const agent = state.agents.find((item) => item.id === agentId);
-  if (!agent) {
-    throw new Error(`Unknown agent id: ${agentId}`);
-  }
-  return agent;
-}
-
-function findThreadByTask(state: RuntimeState, taskId: string): ThreadRecord {
-  const thread = state.threads.find((item) => item.taskIds.includes(taskId));
-  if (!thread) {
-    throw new Error(`Task ${taskId} is not linked to a thread`);
-  }
-  return thread;
+  pushRuntimeSnapshotToSupabase(config, providerConfig, state, listEvents(state, 50));
 }
