@@ -20,32 +20,32 @@ The main target is over-centralized responsibility across a few large files.
 
 - [ ] Split `src/state.ts` into smaller domain modules.
 - [x] Extract thread and message logic into a dedicated module.
-- [ ] Extract task graph and task workflow logic into a dedicated module.
+- [x] Extract task graph and task workflow logic into a dedicated module.
 - [x] Extract memory and recommendation logic into a dedicated module.
 - [x] Extract session and actor resolution logic into a dedicated module.
 - [ ] Leave `src/state.ts` as a thin compatibility layer until all callers are migrated.
 
 ## Priority 1
 
-- [ ] Create a single task state machine or policy module for status transitions.
+- [x] Create a single task state machine or policy module for status transitions.
 - [ ] Move lane-specific rules out of `continueThread` and `runTaskWorkTurn`.
-- [ ] Move design handoff prerequisite checks into the same policy layer.
+- [x] Move design handoff prerequisite checks into the same policy layer.
 - [ ] Replace scattered status strings with a shared status contract.
-- [ ] Add focused tests for allowed transitions and blocked transitions.
+- [x] Add focused tests for allowed transitions and blocked transitions.
 
 ## Priority 2
 
-- [ ] Extract conversation orchestration from `src/state.ts`.
-- [ ] Move `respondToThread` into a dedicated orchestrator module.
-- [ ] Move `resolveConversationAction` into a dedicated command intent module.
-- [ ] Move auto-continue loop behavior into an orchestrator loop module.
+- [x] Extract conversation orchestration from `src/state.ts`.
+- [x] Move `respondToThread` into a dedicated orchestrator module.
+- [x] Move `resolveConversationAction` into a dedicated command intent module.
+- [x] Move auto-continue loop behavior into an orchestrator loop module.
 - [ ] Keep direct agent mention behavior and manager reply behavior compatible with current tests.
 
 ## Priority 3
 
-- [ ] Refactor `src/server.ts` so route registration is declarative.
-- [ ] Introduce a shared mutation wrapper for auth, execute, save, broadcast, and respond.
-- [ ] Group routes by resource instead of keeping them in one long request handler.
+- [x] Refactor `src/server.ts` so route registration is declarative.
+- [x] Introduce a shared mutation wrapper for auth, execute, save, broadcast, and respond.
+- [x] Group routes by resource instead of keeping them in one long request handler.
 - [ ] Keep the current `/v1/*` endpoint surface unchanged.
 
 ## Priority 4

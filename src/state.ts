@@ -4,7 +4,6 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { resolve } from "node:path";
 import YAML from "yaml";
 
-import { generateTaskArtifacts } from "./agent-runtime.js";
 import type { JSONObject, RoutingPolicy } from "./config.js";
 import { resolveRoutingPolicy } from "./config.js";
 import {
@@ -28,20 +27,25 @@ import {
   revokeSession as revokeSessionRecord
 } from "./state/session-domain.js";
 import {
-  autoReviewTarget as findAutoReviewTarget,
   createExecutionTasksFromLanes as createLaneExecutionTasks,
   dependenciesSatisfied as areDependenciesSatisfied,
   deriveRequestedLanes as inferRequestedLanes,
   findNextReadyChildTask as findNextReadyThreadChildTask,
   getOrderedThreadTasks as getOrderedTasksForThread,
+  workTurnMessage as composeWorkTurnMessage
+} from "./state/task-workflow-helpers.js";
+import {
+  autoReviewTarget as findAutoReviewTarget,
+  isTaskAwaitingConsultation,
   isTaskBlocked as isWorkflowTaskBlocked,
   isTaskComplete as isWorkflowTaskComplete,
+  isTaskReviewRequested,
+  isTaskWaitingForApproval,
   nextStatusForWorkTurn as getNextStatusForWorkTurn,
   refreshTaskGraphState as refreshWorkflowTaskGraphState,
   requiresDesignHandoff as needsDesignHandoff,
-  selectAgentForTask as chooseAgentForTask,
-  workTurnMessage as composeWorkTurnMessage
-} from "./state/task-workflow-helpers.js";
+  selectAgentForTask as chooseAgentForTask
+} from "./state/task-policy.js";
 import {
   assignTask as assignTaskRecord,
   autoAssignTask as autoAssignTaskRecord,
@@ -49,6 +53,21 @@ import {
   updateTaskStatus as updateTaskStatusRecord,
   validateDesignHandoffArtifacts as validateDesignHandoffArtifactsRecord
 } from "./state/task-lifecycle.js";
+import {
+  completeTaskReview as completeTaskReviewRecord,
+  decideApproval as decideApprovalRecord,
+  handoffTask as handoffTaskRecord,
+  requestApproval as requestApprovalRecord,
+  requestConsultation as requestConsultationRecord,
+  requestTaskReview as requestTaskReviewRecord,
+  resolveConsultation as resolveConsultationRecord
+} from "./state/task-collaboration.js";
+import { runTaskWorkTurn as runTaskWorkTurnRecord } from "./state/task-execution.js";
+import {
+  intakeRequest as intakeRequestFlow,
+  respondToThread as respondToThreadFlow,
+  continueThread as continueThreadFlow
+} from "./orchestrator/thread-orchestrator.js";
 
 type RuntimeProject = {
   id: string;
@@ -964,81 +983,32 @@ export function respondToThread(
   state: RuntimeState,
   input: { threadId: string; body: string }
 ): { threadId: string; userMessage: MessageRecord; responseMessage: MessageRecord } {
-  const thread = state.threads.find((item) => item.id === input.threadId);
-  if (!thread) {
-    throw new Error(`Unknown thread id: ${input.threadId}`);
-  }
-  const routing = resolveRoutingPolicy(config);
-  const userMessage = addMessage(state, {
-    threadId: thread.id,
-    role: "user",
-    body: input.body
-  }, routing);
-  const detail = getThreadDetail(state, thread.id);
-  addMemory(state, {
-    scope: "thread",
-    projectId: detail.tasks[0]?.projectId ?? null,
-    threadId: thread.id,
-    kind: "follow_up",
-    body: `User follow-up: ${input.body}`,
-    tags: ["follow-up", "thread"]
-  });
-  const targetedAgentId = userMessage.targetAgentId;
-  const targetedAgent = targetedAgentId ? state.agents.find((agent) => agent.id === targetedAgentId) ?? null : null;
-  const directAction = !targetedAgent ? resolveConversationAction(config, state, detail, input.body) : null;
-  const responseMessage = addMessage(state, {
-    threadId: thread.id,
-    role: targetedAgent ? "agent" : "system",
-    body: targetedAgent
-      ? composeAgentDirectedReply(state, targetedAgent, detail, input.body)
-      : directAction?.kind === "continue_loop"
-        ? composeContinueLoopReply(continueThreadUntilPause(config, root, state, { threadId: thread.id }))
-        : directAction?.kind === "create_project"
-          ? composeProjectCreationReply(createProject(state, directAction.project))
-          : directAction?.kind === "install_agent"
-            ? composeAgentInstallReply(
-                installAndMaybeAssignAgent(state, root, {
-                  sourceKind: directAction.sourceKind,
-                  ref: directAction.ref,
-                  trustState: directAction.trustState,
-                  projectId: directAction.assignProjectId
-                })
-              )
-            : directAction?.kind === "people_summary"
-              ? composePeopleSummaryReply(listPeopleOverview(state))
-      : composeManagerThreadReply(
-        detail,
-        input.body,
-        recommendMemories(state, {
-          projectId: detail.tasks[0]?.projectId ?? undefined,
-          threadId: thread.id,
-          taskId: detail.tasks[0]?.id ?? undefined,
-          query: input.body,
-          limit: 3
-        }),
-        recommendTasks(state, {
-          projectId: detail.tasks[0]?.projectId ?? undefined,
-          threadId: thread.id,
-          taskId: detail.tasks[0]?.id ?? undefined,
-          query: input.body,
-          limit: 3
-        })
-      ),
-    routedProjectId: detail.tasks[0]?.projectId ?? userMessage.routedProjectId,
-    suggestedLane: detail.tasks[0]?.lane ?? userMessage.suggestedLane,
-    targetAgentId: targetedAgent?.id ?? null
-  }, routing);
-  appendEvent(state, {
-    type: "thread.responded",
-    entityType: "thread",
-    entityId: thread.id,
-    timestamp: responseMessage.createdAt,
-    payload: {
-      userMessageId: userMessage.id,
-      responseMessageId: responseMessage.id
-    }
-  });
-  return { threadId: thread.id, userMessage, responseMessage };
+  return respondToThreadFlow(config, root, state, input, {
+    addMemory,
+    addMessage,
+    appendEvent,
+    assignAgentToProject,
+    assignTask,
+    autoAssignTask,
+    completeTaskReview,
+    createExecutionTasksFromLanes,
+    createProject,
+    createThread,
+    createTask,
+    deriveRequestedLanes,
+    getOrderedThreadTasks,
+    getThreadDetail,
+    inferProjectFromMessage,
+    installAgentPackage,
+    listPeopleOverview,
+    promoteMessageToTask,
+    recommendMemories,
+    recommendTasks,
+    refreshTaskGraphState,
+    requestTaskReview,
+    runTaskWorkTurn,
+    selectAgentForTask
+  }) as { threadId: string; userMessage: MessageRecord; responseMessage: MessageRecord };
 }
 
 export function createThread(state: RuntimeState, input: { title: string }): ThreadRecord {
@@ -1120,128 +1090,32 @@ export function intakeRequest(
   state: RuntimeState,
   input: { title: string; body: string; projectId?: string; lane?: string }
 ): IntakeResult {
-  const routing = resolveRoutingPolicy(config);
-  const thread = createThread(state, { title: input.title });
-  const message = addMessage(state, {
-    threadId: thread.id,
-    role: "user",
-    body: input.body,
-    routedProjectId: input.projectId ?? null,
-    suggestedLane: input.lane ?? null
-  }, routing);
-  const projectId = input.projectId ?? message.routedProjectId ?? inferProjectFromMessage(state, input.body, routing);
-  if (!projectId) {
-    throw new Error("Could not determine project for intake request");
-  }
-  const requestedLanes = deriveRequestedLanes(state, projectId, input.body, input.lane ?? message.suggestedLane ?? undefined, routing);
-  const rootTask = createTask(state, {
-    projectId,
-    title: input.title,
-    description: input.body,
-    lane: "planning"
-  });
-  rootTask.status = "in_progress";
-  rootTask.completionSummary = "Comphony accepted the request and is coordinating child tasks.";
-  if (!thread.taskIds.includes(rootTask.id)) {
-    thread.taskIds.push(rootTask.id);
-  }
-  const plannedTasks = createExecutionTasksFromLanes(state, {
-    projectId,
-    body: input.body,
-    parentTaskId: rootTask.id,
-    threadId: thread.id,
-    requestedLanes
-  });
-  const task = plannedTasks[0] ?? promoteMessageToTask(state, {
-    messageId: message.id,
-    projectId,
-    lane: requestedLanes[0],
-    title: input.title
-  }, routing);
-  for (const plannedTask of plannedTasks) {
-    if (!thread.taskIds.includes(plannedTask.id)) {
-      thread.taskIds.push(plannedTask.id);
-    }
-  }
-  addMemory(state, {
-    scope: "thread",
-    projectId: task.projectId,
-    threadId: thread.id,
-    taskId: task.id,
-    kind: "intake",
-    body: `Intake created for ${task.title} in lane ${task.lane}.`,
-    tags: ["intake", task.lane]
-  });
-  const preferredAgent = selectAgentForTask(state, task, routing);
-  if (!preferredAgent) {
-    const result = {
-      thread,
-      message,
-      task,
-      rootTaskId: rootTask.id,
-      createdTaskIds: [rootTask.id, ...plannedTasks.map((item) => item.id)],
-      assignedAgentId: null,
-      assignmentError: "No eligible agent found for this task."
-    };
-    appendEvent(state, {
-      type: "intake.completed",
-      entityType: "thread",
-      entityId: thread.id,
-      timestamp: task.updatedAt,
-      payload: {
-        taskId: task.id,
-        assignedAgentId: null,
-        assignmentError: result.assignmentError
-      }
-    });
-    return result;
-  }
-  try {
-    assignTask(config, root, state, { taskId: task.id, agentId: preferredAgent.id });
-    const result = {
-      thread,
-      message,
-      task,
-      rootTaskId: rootTask.id,
-      createdTaskIds: [rootTask.id, ...plannedTasks.map((item) => item.id)],
-      assignedAgentId: preferredAgent.id,
-      assignmentError: null
-    };
-    appendEvent(state, {
-      type: "intake.completed",
-      entityType: "thread",
-      entityId: thread.id,
-      timestamp: task.updatedAt,
-      payload: {
-        taskId: task.id,
-        assignedAgentId: preferredAgent.id,
-        assignmentError: null
-      }
-    });
-    return result;
-  } catch (error) {
-    const result = {
-      thread,
-      message,
-      task,
-      rootTaskId: rootTask.id,
-      createdTaskIds: [rootTask.id, ...plannedTasks.map((item) => item.id)],
-      assignedAgentId: null,
-      assignmentError: error instanceof Error ? error.message : String(error)
-    };
-    appendEvent(state, {
-      type: "intake.completed",
-      entityType: "thread",
-      entityId: thread.id,
-      timestamp: task.updatedAt,
-      payload: {
-        taskId: task.id,
-        assignedAgentId: null,
-        assignmentError: result.assignmentError
-      }
-    });
-    return result;
-  }
+  return intakeRequestFlow(config, root, state, input, {
+    addMemory,
+    addMessage,
+    appendEvent,
+    assignAgentToProject,
+    assignTask,
+    autoAssignTask,
+    completeTaskReview,
+    createExecutionTasksFromLanes,
+    createProject,
+    createThread,
+    createTask,
+    deriveRequestedLanes,
+    getOrderedThreadTasks,
+    getThreadDetail,
+    inferProjectFromMessage,
+    installAgentPackage,
+    listPeopleOverview,
+    promoteMessageToTask,
+    recommendMemories,
+    recommendTasks,
+    refreshTaskGraphState,
+    requestTaskReview,
+    runTaskWorkTurn,
+    selectAgentForTask
+  }) as IntakeResult;
 }
 
 export function createTask(
@@ -1299,74 +1173,19 @@ export function handoffTask(
   state: RuntimeState,
   input: { taskId: string; lane: string }
 ): { task: TaskRecord; threadId: string; message: MessageRecord; agentId: string | null; error: string | null } {
-  const task = state.tasks.find((item) => item.id === input.taskId);
-  if (!task) {
-    throw new Error(`Unknown task id: ${input.taskId}`);
-  }
-  const project = state.projects.find((item) => item.id === task.projectId);
-  if (!project) {
-    throw new Error(`Unknown project id: ${task.projectId}`);
-  }
-  if (!project.lanes.includes(input.lane)) {
-    throw new Error(`Lane ${input.lane} is not defined for project ${task.projectId}`);
-  }
-  const thread = state.threads.find((item) => item.taskIds.includes(task.id));
-  if (!thread) {
-    throw new Error(`Task ${task.id} is not linked to a thread`);
-  }
-
-  const previousLane = task.lane;
-  const previousAssigneeId = task.assigneeId;
-  const now = new Date().toISOString();
-  task.lane = input.lane;
-  task.status = "new";
-  task.assigneeId = null;
-  task.updatedAt = now;
-  thread.updatedAt = now;
-
-  const message = addMessage(state, {
-    threadId: thread.id,
-    role: "system",
-    body: `Comphony handed off ${task.title} from ${previousLane} to ${input.lane}.`,
-    routedProjectId: task.projectId,
-    suggestedLane: input.lane
+  return handoffTaskRecord(config, root, state, input, {
+    addMessage,
+    addMemory,
+    appendEvent,
+    autoAssignTask,
+    findAgent,
+    findTask,
+    findThreadByTask,
+    nextApprovalId,
+    nextConsultationId,
+    nextReviewId,
+    refreshTaskGraphState
   });
-
-  appendEvent(state, {
-    type: "task.handed_off",
-    entityType: "task",
-    entityId: task.id,
-    timestamp: now,
-    payload: {
-      threadId: thread.id,
-      previousLane,
-      lane: input.lane,
-      previousAssigneeId
-    }
-  });
-
-  const assigned = autoAssignTask(config, root, state, task.id);
-  message.body = assigned.agentId
-    ? `Comphony handed off ${task.title} from ${previousLane} to ${input.lane} and assigned ${assigned.agentId}.`
-    : `Comphony handed off ${task.title} from ${previousLane} to ${input.lane} but no eligible agent was available.`;
-  addMemory(state, {
-    scope: "task",
-    projectId: task.projectId,
-    threadId: thread.id,
-    taskId: task.id,
-    agentId: assigned.agentId,
-    kind: "handoff",
-    body: message.body,
-    tags: ["handoff", previousLane, input.lane]
-  });
-  refreshTaskGraphState(state, task.id);
-  return {
-    task,
-    threadId: thread.id,
-    message,
-    agentId: assigned.agentId,
-    error: assigned.error
-  };
 }
 
 export function requestConsultation(
@@ -1374,66 +1193,19 @@ export function requestConsultation(
   state: RuntimeState,
   input: { taskId: string; toAgentId: string; reason: string; instructions?: string }
 ): { consultation: ConsultationRecord; task: TaskRecord; threadId: string; message: MessageRecord } {
-  const task = findTask(state, input.taskId);
-  const thread = findThreadByTask(state, task.id);
-  const agent = findAgent(state, input.toAgentId);
-  if (!agent.assignedProjects.includes(task.projectId)) {
-    throw new Error(`Agent ${agent.id} is not assigned to project ${task.projectId}`);
-  }
-
-  const now = new Date().toISOString();
-  const consultation: ConsultationRecord = {
-    id: nextConsultationId(state),
-    taskId: task.id,
-    threadId: thread.id,
-    fromAgentId: task.assigneeId,
-    toAgentId: agent.id,
-    reason: input.reason,
-    instructions: input.instructions ?? "",
-    status: "requested",
-    response: null,
-    createdAt: now,
-    updatedAt: now
-  };
-  state.consultations.push(consultation);
-  task.status = "consulting";
-  task.blockingReason = input.reason;
-  task.updatedAt = now;
-  thread.updatedAt = now;
-
-  const message = addMessage(state, {
-    threadId: thread.id,
-    role: "system",
-    body: `Comphony requested consultation from ${agent.id} for ${task.title}. Reason: ${input.reason}`,
-    routedProjectId: task.projectId,
-    suggestedLane: task.lane
-  }, resolveRoutingPolicy(config));
-
-  appendEvent(state, {
-    type: "task.consultation_requested",
-    entityType: "consultation",
-    entityId: consultation.id,
-    timestamp: now,
-    payload: {
-      taskId: task.id,
-      threadId: thread.id,
-      fromAgentId: consultation.fromAgentId,
-      toAgentId: consultation.toAgentId
-    }
+  return requestConsultationRecord(config, state, input, {
+    addMessage,
+    addMemory,
+    appendEvent,
+    autoAssignTask,
+    findAgent,
+    findTask,
+    findThreadByTask,
+    nextApprovalId,
+    nextConsultationId,
+    nextReviewId,
+    refreshTaskGraphState
   });
-  addMemory(state, {
-    scope: "task",
-    projectId: task.projectId,
-    threadId: thread.id,
-    taskId: task.id,
-    agentId: agent.id,
-    kind: "consultation_requested",
-    body: `${agent.id} was consulted for ${task.title}: ${input.reason}`,
-    tags: ["consultation", task.lane]
-  });
-  refreshTaskGraphState(state, task.id);
-
-  return { consultation, task, threadId: thread.id, message };
 }
 
 export function resolveConsultation(
@@ -1441,53 +1213,19 @@ export function resolveConsultation(
   state: RuntimeState,
   input: { consultationId: string; response: string }
 ): { consultation: ConsultationRecord; task: TaskRecord; threadId: string; message: MessageRecord } {
-  const consultation = state.consultations.find((item) => item.id === input.consultationId);
-  if (!consultation) {
-    throw new Error(`Unknown consultation id: ${input.consultationId}`);
-  }
-  const task = findTask(state, consultation.taskId);
-  const thread = findThreadByTask(state, task.id);
-  const now = new Date().toISOString();
-  consultation.status = "answered";
-  consultation.response = input.response;
-  consultation.updatedAt = now;
-  task.status = "in_progress";
-  task.blockingReason = null;
-  task.updatedAt = now;
-  thread.updatedAt = now;
-
-  const message = addMessage(state, {
-    threadId: thread.id,
-    role: "agent",
-    body: `Consultation ${consultation.id} answered by ${consultation.toAgentId}: ${input.response}`,
-    routedProjectId: task.projectId,
-    suggestedLane: task.lane
-  }, resolveRoutingPolicy(config));
-
-  appendEvent(state, {
-    type: "task.consultation_resolved",
-    entityType: "consultation",
-    entityId: consultation.id,
-    timestamp: now,
-    payload: {
-      taskId: task.id,
-      threadId: thread.id,
-      toAgentId: consultation.toAgentId
-    }
+  return resolveConsultationRecord(config, state, input, {
+    addMessage,
+    addMemory,
+    appendEvent,
+    autoAssignTask,
+    findAgent,
+    findTask,
+    findThreadByTask,
+    nextApprovalId,
+    nextConsultationId,
+    nextReviewId,
+    refreshTaskGraphState
   });
-  addMemory(state, {
-    scope: "task",
-    projectId: task.projectId,
-    threadId: thread.id,
-    taskId: task.id,
-    agentId: consultation.toAgentId,
-    kind: "consultation_response",
-    body: input.response,
-    tags: ["consultation", "response", task.lane]
-  });
-  refreshTaskGraphState(state, task.id);
-
-  return { consultation, task, threadId: thread.id, message };
 }
 
 export function requestTaskReview(
@@ -1495,64 +1233,19 @@ export function requestTaskReview(
   state: RuntimeState,
   input: { taskId: string; reviewerAgentId: string; reason: string }
 ): { review: ReviewRecord; task: TaskRecord; threadId: string; message: MessageRecord } {
-  const task = findTask(state, input.taskId);
-  const thread = findThreadByTask(state, task.id);
-  const reviewer = findAgent(state, input.reviewerAgentId);
-  if (!reviewer.assignedProjects.includes(task.projectId)) {
-    throw new Error(`Agent ${reviewer.id} is not assigned to project ${task.projectId}`);
-  }
-
-  const now = new Date().toISOString();
-  const review: ReviewRecord = {
-    id: nextReviewId(state),
-    taskId: task.id,
-    threadId: thread.id,
-    requesterAgentId: task.assigneeId,
-    reviewerAgentId: reviewer.id,
-    reason: input.reason,
-    status: "requested",
-    outcome: null,
-    notes: null,
-    createdAt: now,
-    updatedAt: now
-  };
-  state.reviews.push(review);
-  task.status = "review_requested";
-  task.updatedAt = now;
-  thread.updatedAt = now;
-
-  const message = addMessage(state, {
-    threadId: thread.id,
-    role: "system",
-    body: `Comphony requested review from ${reviewer.id} for ${task.title}. Reason: ${input.reason}`,
-    routedProjectId: task.projectId,
-    suggestedLane: "review"
-  }, resolveRoutingPolicy(config));
-
-  appendEvent(state, {
-    type: "task.review_requested",
-    entityType: "review",
-    entityId: review.id,
-    timestamp: now,
-    payload: {
-      taskId: task.id,
-      threadId: thread.id,
-      reviewerAgentId: reviewer.id
-    }
+  return requestTaskReviewRecord(config, state, input, {
+    addMessage,
+    addMemory,
+    appendEvent,
+    autoAssignTask,
+    findAgent,
+    findTask,
+    findThreadByTask,
+    nextApprovalId,
+    nextConsultationId,
+    nextReviewId,
+    refreshTaskGraphState
   });
-  addMemory(state, {
-    scope: "task",
-    projectId: task.projectId,
-    threadId: thread.id,
-    taskId: task.id,
-    agentId: reviewer.id,
-    kind: "review_requested",
-    body: `${reviewer.id} was asked to review ${task.title}: ${input.reason}`,
-    tags: ["review", task.lane]
-  });
-  refreshTaskGraphState(state, task.id);
-
-  return { review, task, threadId: thread.id, message };
 }
 
 export function completeTaskReview(
@@ -1560,58 +1253,19 @@ export function completeTaskReview(
   state: RuntimeState,
   input: { reviewId: string; outcome: "approved" | "changes_requested"; notes?: string }
 ): { review: ReviewRecord; task: TaskRecord; threadId: string; message: MessageRecord } {
-  const review = state.reviews.find((item) => item.id === input.reviewId);
-  if (!review) {
-    throw new Error(`Unknown review id: ${input.reviewId}`);
-  }
-  const task = findTask(state, review.taskId);
-  const thread = findThreadByTask(state, task.id);
-  const now = new Date().toISOString();
-  review.outcome = input.outcome;
-  review.notes = input.notes ?? null;
-  review.status = input.outcome;
-  review.updatedAt = now;
-  task.status = input.outcome === "approved" ? "reported" : "in_progress";
-  task.completionSummary = input.outcome === "approved"
-    ? input.notes ?? `Review approved for ${task.title}.`
-    : input.notes ?? `Changes requested for ${task.title}.`;
-  task.updatedAt = now;
-  thread.updatedAt = now;
-
-  const message = addMessage(state, {
-    threadId: thread.id,
-    role: "system",
-    body: input.outcome === "approved"
-      ? `Review ${review.id} approved ${task.title}.${input.notes ? ` Notes: ${input.notes}` : ""}`
-      : `Review ${review.id} requested changes for ${task.title}.${input.notes ? ` Notes: ${input.notes}` : ""}`,
-    routedProjectId: task.projectId,
-    suggestedLane: task.lane
-  }, resolveRoutingPolicy(config));
-
-  appendEvent(state, {
-    type: "task.review_completed",
-    entityType: "review",
-    entityId: review.id,
-    timestamp: now,
-    payload: {
-      taskId: task.id,
-      threadId: thread.id,
-      outcome: input.outcome
-    }
+  return completeTaskReviewRecord(config, state, input, {
+    addMessage,
+    addMemory,
+    appendEvent,
+    autoAssignTask,
+    findAgent,
+    findTask,
+    findThreadByTask,
+    nextApprovalId,
+    nextConsultationId,
+    nextReviewId,
+    refreshTaskGraphState
   });
-  addMemory(state, {
-    scope: "task",
-    projectId: task.projectId,
-    threadId: thread.id,
-    taskId: task.id,
-    agentId: review.reviewerAgentId,
-    kind: "review_outcome",
-    body: input.notes ?? input.outcome,
-    tags: ["review", input.outcome, task.lane]
-  });
-
-  refreshTaskGraphState(state, task.id);
-  return { review, task, threadId: thread.id, message };
 }
 
 export function requestApproval(
@@ -1619,57 +1273,19 @@ export function requestApproval(
   state: RuntimeState,
   input: { action: string; reason: string; taskId?: string; requestedBy?: string | null }
 ): { approval: ApprovalRecord; task: TaskRecord | null; threadId: string | null; message: MessageRecord | null } {
-  const task = input.taskId ? findTask(state, input.taskId) : null;
-  const thread = task ? findThreadByTask(state, task.id) : null;
-  const now = new Date().toISOString();
-  const approval: ApprovalRecord = {
-    id: nextApprovalId(state),
-    taskId: task?.id ?? null,
-    threadId: thread?.id ?? null,
-    action: input.action,
-    reason: input.reason,
-    status: "requested",
-    requestedBy: input.requestedBy ?? task?.assigneeId ?? null,
-    decidedBy: null,
-    notes: null,
-    resumeStatus: task?.status ?? null,
-    createdAt: now,
-    updatedAt: now
-  };
-  state.approvals.push(approval);
-
-  let message: MessageRecord | null = null;
-  if (task && thread) {
-    task.needsApproval = true;
-    task.status = "waiting";
-    task.blockingReason = input.reason;
-    task.updatedAt = now;
-    thread.updatedAt = now;
-    message = addMessage(state, {
-      threadId: thread.id,
-      role: "system",
-      body: `Comphony requested approval for ${input.action} on ${task.title}. Reason: ${input.reason}`,
-      routedProjectId: task.projectId,
-      suggestedLane: task.lane
-    }, resolveRoutingPolicy(config));
-  }
-
-  appendEvent(state, {
-    type: "approval.requested",
-    entityType: "approval",
-    entityId: approval.id,
-    timestamp: now,
-    payload: {
-      taskId: approval.taskId,
-      threadId: approval.threadId,
-      action: approval.action
-    }
+  return requestApprovalRecord(config, state, input, {
+    addMessage,
+    addMemory,
+    appendEvent,
+    autoAssignTask,
+    findAgent,
+    findTask,
+    findThreadByTask,
+    nextApprovalId,
+    nextConsultationId,
+    nextReviewId,
+    refreshTaskGraphState
   });
-  if (task) {
-    refreshTaskGraphState(state, task.id);
-  }
-
-  return { approval, task, threadId: thread?.id ?? null, message };
 }
 
 export function decideApproval(
@@ -1677,58 +1293,19 @@ export function decideApproval(
   state: RuntimeState,
   input: { approvalId: string; decision: "granted" | "denied"; actorId?: string | null; notes?: string }
 ): { approval: ApprovalRecord; task: TaskRecord | null; threadId: string | null; message: MessageRecord | null } {
-  const approval = state.approvals.find((item) => item.id === input.approvalId);
-  if (!approval) {
-    throw new Error(`Unknown approval id: ${input.approvalId}`);
-  }
-  const task = approval.taskId ? findTask(state, approval.taskId) : null;
-  const thread = approval.threadId ? state.threads.find((item) => item.id === approval.threadId) ?? null : null;
-  const now = new Date().toISOString();
-
-  approval.status = input.decision;
-  approval.decidedBy = input.actorId ?? null;
-  approval.notes = input.notes ?? null;
-  approval.updatedAt = now;
-
-  let message: MessageRecord | null = null;
-  if (task) {
-    task.needsApproval = false;
-    task.updatedAt = now;
-    if (input.decision === "granted") {
-      task.blockingReason = null;
-      task.status = approval.resumeStatus ?? "triaged";
-    } else {
-      task.status = "blocked";
-      task.blockingReason = input.notes ?? approval.reason;
-    }
-    refreshTaskGraphState(state, task.id);
-  }
-  if (thread) {
-    thread.updatedAt = now;
-    message = addMessage(state, {
-      threadId: thread.id,
-      role: "system",
-      body: input.decision === "granted"
-        ? `Approval ${approval.id} was granted for ${approval.action}.${input.notes ? ` Notes: ${input.notes}` : ""}`
-        : `Approval ${approval.id} was denied for ${approval.action}.${input.notes ? ` Notes: ${input.notes}` : ""}`,
-      routedProjectId: task?.projectId ?? null,
-      suggestedLane: task?.lane ?? null
-    }, resolveRoutingPolicy(config));
-  }
-
-  appendEvent(state, {
-    type: input.decision === "granted" ? "approval.granted" : "approval.denied",
-    entityType: "approval",
-    entityId: approval.id,
-    timestamp: now,
-    payload: {
-      taskId: approval.taskId,
-      threadId: approval.threadId,
-      action: approval.action
-    }
+  return decideApprovalRecord(config, state, input, {
+    addMessage,
+    addMemory,
+    appendEvent,
+    autoAssignTask,
+    findAgent,
+    findTask,
+    findThreadByTask,
+    nextApprovalId,
+    nextConsultationId,
+    nextReviewId,
+    refreshTaskGraphState
   });
-
-  return { approval, task, threadId: thread?.id ?? null, message };
 }
 
 export function runTaskWorkTurn(
@@ -1737,87 +1314,13 @@ export function runTaskWorkTurn(
   state: RuntimeState,
   input: { taskId: string }
 ): { task: TaskRecord; threadId: string; message: MessageRecord } {
-  const task = state.tasks.find((item) => item.id === input.taskId);
-  if (!task) {
-    throw new Error(`Unknown task id: ${input.taskId}`);
-  }
-  if (task.needsApproval || task.status === "waiting") {
-    throw new Error(`Task ${task.id} is waiting for approval before more work can run`);
-  }
-  if (["blocked", "consulting", "review_requested", "reported", "failed", "canceled"].includes(task.status)) {
-    throw new Error(`Task ${task.id} cannot run a work turn while in ${task.status}`);
-  }
-  if (!task.assigneeId) {
-    throw new Error(`Task ${task.id} has no assignee`);
-  }
-  const agent = state.agents.find((item) => item.id === task.assigneeId);
-  if (!agent) {
-    throw new Error(`Unknown agent id: ${task.assigneeId}`);
-  }
-  const thread = state.threads.find((item) => item.taskIds.includes(task.id));
-  if (!thread) {
-    throw new Error(`Task ${task.id} is not linked to a thread`);
-  }
-
-  const artifacts = generateTaskArtifacts({
-    config,
-    root,
-    state,
-    task,
-    agentId: agent.id
+  return runTaskWorkTurnRecord(config, root, state, input, {
+    addMessage,
+    addMemory,
+    appendEvent,
+    findThreadByTask,
+    refreshTaskGraphState
   });
-  const previousStatus = task.status;
-  const nextStatus = nextStatusForWorkTurn(task.lane, previousStatus);
-  const now = new Date().toISOString();
-  const message = addMessage(state, {
-    threadId: thread.id,
-    role: "agent",
-    body: workTurnMessage(agent.name, agent.role, task, nextStatus, artifacts),
-    routedProjectId: task.projectId,
-    suggestedLane: task.lane
-  });
-
-  task.artifactPaths = Array.from(new Set([...task.artifactPaths, ...artifacts.artifactPaths]));
-  task.status = nextStatus;
-  task.updatedAt = now;
-  thread.updatedAt = now;
-  appendEvent(state, {
-    type: "task.artifacts_generated",
-    entityType: "task",
-    entityId: task.id,
-    timestamp: now,
-    payload: {
-      threadId: thread.id,
-      artifactCount: artifacts.artifactPaths.length,
-      assigneeId: agent.id
-    }
-  });
-  appendEvent(state, {
-    type: "task.work_turn_completed",
-    entityType: "task",
-    entityId: task.id,
-    timestamp: now,
-    payload: {
-      threadId: thread.id,
-      assigneeId: agent.id,
-      previousStatus,
-      status: nextStatus
-    }
-  });
-  addMemory(state, {
-    scope: "task",
-    projectId: task.projectId,
-    threadId: thread.id,
-    taskId: task.id,
-    agentId: agent.id,
-    kind: "work_turn",
-    body: artifacts.summary,
-    tags: [task.lane, task.status, agent.role]
-  });
-  task.completionSummary = artifacts.summary;
-  refreshTaskGraphState(state, task.id);
-
-  return { task, threadId: thread.id, message };
 }
 
 export function continueThread(
@@ -1826,155 +1329,32 @@ export function continueThread(
   state: RuntimeState,
   input: { threadId: string }
 ): ContinueThreadResult {
-  const thread = state.threads.find((item) => item.id === input.threadId);
-  if (!thread) {
-    throw new Error(`Unknown thread id: ${input.threadId}`);
-  }
-
-  const readyTasks = getOrderedThreadTasks(state, thread.id);
-  const activeTask = readyTasks.find((task) => !isTaskComplete(task) && task.parentTaskId !== null) ?? readyTasks.find((task) => !isTaskComplete(task));
-  if (!activeTask) {
-    const message = addMessage(state, {
-      threadId: thread.id,
-      role: "system",
-      body: "Comphony has no remaining work on this thread. All linked tasks are complete."
-    }, resolveRoutingPolicy(config));
-    return {
-      threadId: thread.id,
-      taskId: null,
-      action: "nothing_to_do",
-      message,
-      task: null,
-      notes: ["all tasks complete"]
-    };
-  }
-
-  if (!dependenciesSatisfied(state, activeTask)) {
-    const message = addMessage(state, {
-      threadId: thread.id,
-      role: "system",
-      body: `Comphony cannot advance ${activeTask.title} yet because dependencies are still incomplete.`
-    }, resolveRoutingPolicy(config));
-    return {
-      threadId: thread.id,
-      taskId: activeTask.id,
-      action: "blocked",
-      message,
-      task: activeTask,
-      notes: ["dependencies incomplete"]
-    };
-  }
-
-  if (activeTask.needsApproval || activeTask.status === "waiting") {
-    const message = addMessage(state, {
-      threadId: thread.id,
-      role: "system",
-      body: `Comphony is waiting for approval before continuing ${activeTask.title}.`
-    }, resolveRoutingPolicy(config));
-    return {
-      threadId: thread.id,
-      taskId: activeTask.id,
-      action: "waiting",
-      message,
-      task: activeTask,
-      notes: ["approval required"]
-    };
-  }
-
-  if (activeTask.status === "consulting") {
-    const message = addMessage(state, {
-      threadId: thread.id,
-      role: "system",
-      body: `Comphony is waiting on specialist input before continuing ${activeTask.title}.`
-    }, resolveRoutingPolicy(config));
-    return {
-      threadId: thread.id,
-      taskId: activeTask.id,
-      action: "waiting",
-      message,
-      task: activeTask,
-      notes: ["consultation pending"]
-    };
-  }
-
-  if (activeTask.status === "review_requested") {
-    const review = state.reviews.find((item) => item.taskId === activeTask.id && item.status === "requested");
-    if (review) {
-      const result = completeTaskReview(config, state, {
-        reviewId: review.id,
-        outcome: "approved",
-        notes: "Auto-approved by Comphony reviewer loop."
-      });
-      refreshTaskGraphState(state, activeTask.id);
-      const nextReady = findNextReadyChildTask(state, thread.id);
-      if (nextReady && !nextReady.assigneeId) {
-        autoAssignTask(config, root, state, nextReady.id);
-      }
-      return {
-        threadId: thread.id,
-        taskId: activeTask.id,
-        action: "review_completed",
-        message: result.message,
-        task: result.task,
-        notes: ["review completed automatically"]
-      };
-    }
-  }
-
-  if (!activeTask.assigneeId) {
-    const assigned = autoAssignTask(config, root, state, activeTask.id);
-    refreshTaskGraphState(state, activeTask.id);
-    const message = addMessage(state, {
-      threadId: thread.id,
-      role: "system",
-      body: assigned.agentId
-        ? `Comphony assigned ${activeTask.title} to ${assigned.agentId}.`
-        : `Comphony could not find an eligible agent for ${activeTask.title}.`,
-      routedProjectId: activeTask.projectId,
-      suggestedLane: activeTask.lane
-    }, resolveRoutingPolicy(config));
-    return {
-      threadId: thread.id,
-      taskId: activeTask.id,
-      action: "assigned",
-      message,
-      task: assigned.task,
-      notes: assigned.error ? [assigned.error] : ["task assigned"]
-    };
-  }
-
-  const work = runTaskWorkTurn(config, root, state, { taskId: activeTask.id });
-  const reviewTarget = autoReviewTarget(state, work.task);
-  if (work.task.status === "review" && work.task.lane !== "review" && reviewTarget) {
-    requestTaskReview(config, state, {
-      taskId: work.task.id,
-      reviewerAgentId: reviewTarget.id,
-      reason: `Auto-review requested after ${work.task.lane} work turn.`
-    });
-    refreshTaskGraphState(state, work.task.id);
-    return {
-      threadId: thread.id,
-      taskId: work.task.id,
-      action: "review_requested",
-      message: work.message,
-      task: work.task,
-      notes: [`review requested from ${reviewTarget.id}`]
-    };
-  }
-
-  refreshTaskGraphState(state, work.task.id);
-  const nextReady = findNextReadyChildTask(state, thread.id);
-  if (isTaskComplete(work.task) && nextReady && !nextReady.assigneeId) {
-    autoAssignTask(config, root, state, nextReady.id);
-  }
-  return {
-    threadId: thread.id,
-    taskId: work.task.id,
-    action: "worked",
-    message: work.message,
-    task: work.task,
-    notes: ["work turn executed"]
-  };
+  return continueThreadFlow(config, root, state, input, {
+    addMemory,
+    addMessage,
+    appendEvent,
+    assignAgentToProject,
+    assignTask,
+    autoAssignTask,
+    completeTaskReview,
+    createExecutionTasksFromLanes,
+    createProject,
+    createThread,
+    createTask,
+    deriveRequestedLanes,
+    getOrderedThreadTasks,
+    getThreadDetail,
+    inferProjectFromMessage,
+    installAgentPackage,
+    listPeopleOverview,
+    promoteMessageToTask,
+    recommendMemories,
+    recommendTasks,
+    refreshTaskGraphState,
+    requestTaskReview,
+    runTaskWorkTurn,
+    selectAgentForTask
+  }) as ContinueThreadResult;
 }
 
 export function validateDesignHandoffArtifacts(
@@ -2056,205 +1436,6 @@ function resolveMentionedAgentId(state: RuntimeState, body: string): string | nu
     }
   }
   return null;
-}
-
-function resolveConversationAction(
-  config: JSONObject,
-  state: RuntimeState,
-  detail: ThreadDetail,
-  body: string
-):
-  | { kind: "continue_loop" }
-  | { kind: "create_project"; project: { id: string; name: string; purpose?: string; lanes: string[]; repoSlug?: string | null } }
-  | { kind: "install_agent"; sourceKind: "local_package" | "registry_package"; ref: string; trustState?: "trusted" | "restricted" | "quarantined"; assignProjectId?: string }
-  | { kind: "people_summary" }
-  | null {
-  const lowered = body.toLowerCase();
-  if (/(who('| i)?s working|who is busy|who is free|team status|people status)/u.test(lowered)) {
-    return { kind: "people_summary" };
-  }
-  if (/(continue|keep going|move forward|proceed|finish this|run the company|drive this)/u.test(lowered)) {
-    return { kind: "continue_loop" };
-  }
-
-  const projectMatch = body.match(/(?:create|open|start|bootstrap)\s+(?:a\s+)?project(?:\s+called)?\s+["']?([^"'\n]+?)["']?(?:[.!?]|$)/iu);
-  if (projectMatch) {
-    const rawName = projectMatch[1]?.trim();
-    if (rawName) {
-      const normalizedId = slugifyProjectId(rawName);
-      const repoSlug = slugifyRepoSlug(rawName);
-      return {
-        kind: "create_project",
-        project: {
-          id: normalizedId,
-          name: rawName,
-          purpose: `Created from thread ${detail.thread.id}`,
-          lanes: ["planning", "research", "design", "build", "review"],
-          repoSlug
-        }
-      };
-    }
-  }
-
-  const sourceMatch = body.match(/https?:\/\/\S+|(?:\.\/|\/)[^\s]+/u);
-  if (sourceMatch && /(hire|install|add).*(agent|designer|developer|researcher|publisher|worker)|\b(agent|designer|developer|researcher|publisher)\b.*\b(hire|install|add)\b/iu.test(body)) {
-    const currentProjectId = detail.tasks[0]?.projectId;
-    return {
-      kind: "install_agent",
-      sourceKind: sourceMatch[0].startsWith("http") ? "registry_package" : "local_package",
-      ref: sourceMatch[0],
-      trustState: sourceMatch[0].startsWith("http") ? "restricted" : "trusted",
-      assignProjectId: currentProjectId ?? undefined
-    };
-  }
-
-  void config;
-  return null;
-}
-
-function continueThreadUntilPause(
-  config: JSONObject,
-  root: string,
-  state: RuntimeState,
-  input: { threadId: string; maxSteps?: number }
-): ContinueThreadResult[] {
-  const results: ContinueThreadResult[] = [];
-  const maxSteps = input.maxSteps ?? 8;
-  for (let index = 0; index < maxSteps; index += 1) {
-    const result = continueThread(config, root, state, { threadId: input.threadId });
-    results.push(result);
-    if (["waiting", "blocked", "nothing_to_do"].includes(result.action)) {
-      break;
-    }
-  }
-  return results;
-}
-
-function composeContinueLoopReply(results: ContinueThreadResult[]): string {
-  if (results.length === 0) {
-    return "Comphony did not take any additional action on this thread.";
-  }
-  const lines = ["Comphony continued the thread automatically."];
-  for (const result of results) {
-    lines.push(
-      `- ${result.action}: ${result.task?.title ?? "thread"}${result.task ? ` (${result.task.status})` : ""}`
-    );
-  }
-  const final = results[results.length - 1];
-  if (final?.notes?.length) {
-    lines.push(`Latest note: ${final.notes.join(", ")}`);
-  }
-  return lines.join("\n");
-}
-
-function composeProjectCreationReply(project: RuntimeProject): string {
-  return [
-    `Comphony opened a new project: ${project.name}.`,
-    `Project id: ${project.id}.`,
-    `Lanes: ${project.lanes.join(", ")}.`,
-    `Repo slug: ${project.repoSlug ?? "-"}.`
-  ].join(" ");
-}
-
-function installAndMaybeAssignAgent(
-  state: RuntimeState,
-  root: string,
-  input: { sourceKind: "local_package" | "registry_package"; ref: string; trustState?: "trusted" | "restricted" | "quarantined"; projectId?: string }
-): { agent: RuntimeAgent; assignedProjectId: string | null } {
-  const agent = installAgentPackage(state, root, {
-    sourceKind: input.sourceKind,
-    ref: input.ref,
-    trustState: input.trustState
-  });
-  if (input.projectId) {
-    assignAgentToProject(state, { agentId: agent.id, projectId: input.projectId });
-    return { agent, assignedProjectId: input.projectId };
-  }
-  return { agent, assignedProjectId: null };
-}
-
-function composeAgentInstallReply(result: { agent: RuntimeAgent; assignedProjectId: string | null }): string {
-  return [
-    `Comphony installed ${result.agent.name} (${result.agent.id}) as a ${result.agent.role} agent.`,
-    `Source: ${result.agent.sourceKind ?? "-"} ${result.agent.sourceRef ?? ""}`.trim(),
-    result.assignedProjectId ? `Assigned to project ${result.assignedProjectId}.` : "No project assignment was applied yet."
-  ].join(" ");
-}
-
-function composePeopleSummaryReply(people: PeopleOverview[]): string {
-  if (people.length === 0) {
-    return "Comphony has no registered agents yet.";
-  }
-  const ordered = people.slice().sort((left, right) => {
-    const score = (person: PeopleOverview) => person.activeTaskCount + person.consultationCount + person.reviewCount;
-    return score(right) - score(left);
-  });
-  return [
-    "Current team snapshot:",
-    ...ordered.map((person) => `- ${person.name} (${person.role}) · ${person.availability} · tasks=${person.activeTaskCount} · consultations=${person.consultationCount} · reviews=${person.reviewCount}`)
-  ].join("\n");
-}
-
-function composeAgentDirectedReply(
-  state: RuntimeState,
-  agent: RuntimeAgent,
-  detail: ThreadDetail,
-  body: string
-): string {
-  const ownedTasks = detail.tasks.filter((task) => task.assigneeId === agent.id || task.projectId && agent.assignedProjects.includes(task.projectId));
-  const currentTask = ownedTasks.find((task) => !isTaskComplete(task)) ?? ownedTasks[0];
-  if (!currentTask) {
-    return `${agent.name} does not have a linked task on this thread yet. Comphony can assign follow-up work if needed.`;
-  }
-  return [
-    `${agent.name} here.`,
-    `I am handling ${currentTask.title} on the ${currentTask.lane} lane.`,
-    `Current status: ${currentTask.status}.`,
-    currentTask.blockingReason ? `Blocker: ${currentTask.blockingReason}.` : "No active blocker right now.",
-    currentTask.completionSummary ? `Latest outcome: ${currentTask.completionSummary}` : `Latest request: ${body}`
-  ].join(" ");
-}
-
-function composeManagerThreadReply(
-  detail: ThreadDetail,
-  latestUserBody: string,
-  memories: Array<MemoryRecord | RecommendedMemory>,
-  recommendedTasks: RecommendedTask[]
-): string {
-  const currentTasks = detail.tasks.filter((task) => task.parentTaskId !== null);
-  const openConsultations = detail.consultations.filter((consultation) => consultation.status === "requested");
-  const openReviews = detail.reviews.filter((review) => review.status === "requested");
-  const openApprovals = detail.approvals.filter((approval) => approval.status === "requested");
-  const currentTask = currentTasks.find((task) => !isTaskComplete(task)) ?? currentTasks[0];
-  if (!currentTask) {
-    return `Comphony logged your follow-up: "${latestUserBody}". This thread has no active child tasks right now.`;
-  }
-
-  const whyAssigned = currentTask.assigneeId
-    ? `Assigned to ${currentTask.assigneeId} because the current lane is ${currentTask.lane}.`
-    : `No assignee yet because Comphony has not selected the next worker.`;
-  const nextStep = currentTask.status === "review_requested"
-    ? "Next step: finish the pending review."
-    : currentTask.status === "waiting"
-      ? "Next step: wait for approval before resuming."
-      : currentTask.status === "consulting"
-        ? "Next step: wait for specialist input."
-        : "Next step: continue execution on the active lane.";
-
-  return [
-    `Comphony logged your follow-up: "${latestUserBody}".`,
-    `Current focus: ${currentTask.title}.`,
-    `Lane=${currentTask.lane}, status=${currentTask.status}, assignee=${currentTask.assigneeId ?? "-"}.`,
-    whyAssigned,
-    nextStep,
-    `Open coordination: consultations=${openConsultations.length}, reviews=${openReviews.length}, approvals=${openApprovals.length}.`,
-    ...(memories.length > 0
-      ? ["Related memory:", ...memories.map((memory) => `- ${memory.kind}: ${memory.body}`)]
-      : []),
-    ...(recommendedTasks.length > 0
-      ? ["Similar tasks:", ...recommendedTasks.map((task) => `- ${task.id}: ${task.title} (${task.lane}, ${task.status})`)]
-      : [])
-  ].join("\n");
 }
 
 function slugifyProjectId(value: string): string {
