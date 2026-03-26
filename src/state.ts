@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import YAML from "yaml";
@@ -7,6 +7,48 @@ import YAML from "yaml";
 import { generateTaskArtifacts } from "./agent-runtime.js";
 import type { JSONObject, RoutingPolicy } from "./config.js";
 import { resolveRoutingPolicy } from "./config.js";
+import {
+  addMessage as addThreadDomainMessage,
+  createThread as createThreadRecord,
+  getThreadDetail as getThreadDomainDetail,
+  listMessages as listThreadMessages,
+  listThreads as listThreadRecords
+} from "./state/thread-domain.js";
+import {
+  addMemory as addMemoryRecord,
+  listMemories as listMemoryRecords,
+  recommendMemories as recommendMemoryRecords,
+  recommendTasks as recommendTaskRecords
+} from "./state/memory-domain.js";
+import {
+  createSession as createSessionRecord,
+  findConfiguredActor as findConfiguredSessionActor,
+  listSessions as listSessionRecords,
+  resolveSession as resolveSessionRecord,
+  revokeSession as revokeSessionRecord
+} from "./state/session-domain.js";
+import {
+  autoReviewTarget as findAutoReviewTarget,
+  createExecutionTasksFromLanes as createLaneExecutionTasks,
+  dependenciesSatisfied as areDependenciesSatisfied,
+  deriveRequestedLanes as inferRequestedLanes,
+  findNextReadyChildTask as findNextReadyThreadChildTask,
+  getOrderedThreadTasks as getOrderedTasksForThread,
+  isTaskBlocked as isWorkflowTaskBlocked,
+  isTaskComplete as isWorkflowTaskComplete,
+  nextStatusForWorkTurn as getNextStatusForWorkTurn,
+  refreshTaskGraphState as refreshWorkflowTaskGraphState,
+  requiresDesignHandoff as needsDesignHandoff,
+  selectAgentForTask as chooseAgentForTask,
+  workTurnMessage as composeWorkTurnMessage
+} from "./state/task-workflow-helpers.js";
+import {
+  assignTask as assignTaskRecord,
+  autoAssignTask as autoAssignTaskRecord,
+  createTask as createTaskRecord,
+  updateTaskStatus as updateTaskStatusRecord,
+  validateDesignHandoffArtifacts as validateDesignHandoffArtifactsRecord
+} from "./state/task-lifecycle.js";
 
 type RuntimeProject = {
   id: string;
@@ -435,18 +477,7 @@ export function listAgentCatalog(state: RuntimeState, root: string): AgentCatalo
 }
 
 export function listSessions(state: RuntimeState, filters?: { actorId?: string; activeOnly?: boolean }): SessionRecord[] {
-  return state.sessions
-    .filter((session) => {
-      if (filters?.actorId && session.actorId !== filters.actorId) {
-        return false;
-      }
-      if (filters?.activeOnly && session.revokedAt !== null) {
-        return false;
-      }
-      return true;
-    })
-    .slice()
-    .sort((left, right) => right.lastSeenAt.localeCompare(left.lastSeenAt));
+  return listSessionRecords(state, filters);
 }
 
 export function createSession(
@@ -454,60 +485,20 @@ export function createSession(
   state: RuntimeState,
   input: { actorId: string; label?: string }
 ): SessionRecord {
-  const actor = findConfiguredActor(config, input.actorId);
-  const now = new Date().toISOString();
-  const session: SessionRecord = {
-    id: `session_${String(state.counters.session + 1).padStart(4, "0")}_${randomUUID().slice(0, 8)}`,
-    actorId: actor.id,
-    role: actor.role,
-    label: input.label ?? null,
-    token: randomBytes(24).toString("hex"),
-    createdAt: now,
-    lastSeenAt: now,
-    revokedAt: null
-  };
-  state.counters.session += 1;
-  state.sessions.push(session);
-  appendEvent(state, {
-    type: "session.created",
-    entityType: "system",
-    entityId: session.id,
-    timestamp: now,
-    payload: {
-      actorId: session.actorId,
-      role: session.role
-    }
+  return createSessionRecord(config, state, input, {
+    appendEvent,
+    findConfiguredActor
   });
-  return session;
 }
 
 export function revokeSession(state: RuntimeState, input: { sessionId: string }): SessionRecord {
-  const session = state.sessions.find((item) => item.id === input.sessionId);
-  if (!session) {
-    throw new Error(`Unknown session id: ${input.sessionId}`);
-  }
-  if (session.revokedAt === null) {
-    session.revokedAt = new Date().toISOString();
-    session.lastSeenAt = session.revokedAt;
-    appendEvent(state, {
-      type: "session.revoked",
-      entityType: "system",
-      entityId: session.id,
-      timestamp: session.revokedAt,
-      payload: {
-        actorId: session.actorId
-      }
-    });
-  }
-  return session;
+  return revokeSessionRecord(state, input, {
+    appendEvent
+  });
 }
 
 export function resolveSession(state: RuntimeState, input: { token: string }): SessionRecord | null {
-  const session = state.sessions.find((item) => item.token === input.token && item.revokedAt === null) ?? null;
-  if (session) {
-    session.lastSeenAt = new Date().toISOString();
-  }
-  return session;
+  return resolveSessionRecord(state, input);
 }
 
 export function createProject(
@@ -633,30 +624,15 @@ export function listTasks(state: RuntimeState, filters?: { projectId?: string; s
 }
 
 export function listThreads(state: RuntimeState): ThreadRecord[] {
-  return state.threads;
+  return listThreadRecords(state);
 }
 
 export function getThreadDetail(state: RuntimeState, threadId: string): ThreadDetail {
-  const thread = state.threads.find((item) => item.id === threadId);
-  if (!thread) {
-    throw new Error(`Unknown thread id: ${threadId}`);
-  }
-  const taskIds = new Set(thread.taskIds);
-  return {
-    thread,
-    messages: state.messages.filter((message) => message.threadId === threadId),
-    tasks: state.tasks.filter((task) => taskIds.has(task.id)),
-    consultations: state.consultations.filter((consultation) => taskIds.has(consultation.taskId)),
-    reviews: state.reviews.filter((review) => taskIds.has(review.taskId)),
-    approvals: state.approvals.filter((approval) => Boolean(approval.taskId && taskIds.has(approval.taskId)))
-  };
+  return getThreadDomainDetail(state, threadId);
 }
 
 export function listMessages(state: RuntimeState, threadId?: string): MessageRecord[] {
-  if (!threadId) {
-    return state.messages;
-  }
-  return state.messages.filter((message) => message.threadId === threadId);
+  return listThreadMessages(state, threadId);
 }
 
 export function listEvents(state: RuntimeState, limit = 50): EventRecord[] {
@@ -667,27 +643,7 @@ export function listMemories(
   state: RuntimeState,
   filters?: { projectId?: string; threadId?: string; taskId?: string; query?: string; limit?: number }
 ): MemoryRecord[] {
-  let items = state.memories.filter((memory) => {
-    if (filters?.projectId && memory.projectId !== filters.projectId) {
-      return false;
-    }
-    if (filters?.threadId && memory.threadId !== filters.threadId) {
-      return false;
-    }
-    if (filters?.taskId && memory.taskId !== filters.taskId) {
-      return false;
-    }
-    if (filters?.query) {
-      const lowered = filters.query.toLowerCase();
-      const haystack = `${memory.body} ${memory.tags.join(" ")}`.toLowerCase();
-      if (!haystack.includes(lowered)) {
-        return false;
-      }
-    }
-    return true;
-  });
-  items = items.slice().reverse();
-  return items.slice(0, filters?.limit ?? 20);
+  return listMemoryRecords(state, filters);
 }
 
 export function listConsultations(
@@ -971,57 +927,16 @@ export function recommendMemories(
   state: RuntimeState,
   input: { projectId?: string; threadId?: string; taskId?: string; query?: string; limit?: number }
 ): RecommendedMemory[] {
-  const queryTokens = tokenize(`${input.query ?? ""}`);
-  const ranked = state.memories
-    .map((memory) => ({
-      ...memory,
-      score: scoreMemory(memory, input, queryTokens)
-    }))
-    .filter((memory) => memory.score > 0)
-    .sort((left, right) => {
-      if (right.score !== left.score) {
-        return right.score - left.score;
-      }
-      return right.createdAt.localeCompare(left.createdAt);
-    });
-  return dedupeRecommendedMemories(ranked).slice(0, input.limit ?? 10);
+  return recommendMemoryRecords(state, input);
 }
 
 export function recommendTasks(
   state: RuntimeState,
   input: { projectId?: string; threadId?: string; taskId?: string; query?: string; limit?: number }
 ): RecommendedTask[] {
-  const queryTokens = tokenize(`${input.query ?? ""}`);
-  const currentThreadTaskIds = input.threadId
-    ? new Set(getThreadDetail(state, input.threadId).tasks.map((task) => task.id))
-    : new Set<string>();
-
-  const ranked = state.tasks
-    .filter((task) => {
-      if (input.projectId && task.projectId !== input.projectId) {
-        return false;
-      }
-      if (input.taskId && task.id === input.taskId) {
-        return false;
-      }
-      if (currentThreadTaskIds.has(task.id)) {
-        return false;
-      }
-      return true;
-    })
-    .map((task) => ({
-      ...task,
-      score: scoreTask(task, queryTokens, input)
-    }))
-    .filter((task) => task.score > 0)
-    .sort((left, right) => {
-      if (right.score !== left.score) {
-        return right.score - left.score;
-      }
-      return right.updatedAt.localeCompare(left.updatedAt);
-    });
-
-  return ranked.slice(0, input.limit ?? 10);
+  return recommendTaskRecords(state, input, {
+    getThreadDetail
+  });
 }
 
 export function addMemory(
@@ -1037,34 +952,10 @@ export function addMemory(
     tags?: string[];
   }
 ): MemoryRecord {
-  const memory: MemoryRecord = {
-    id: nextMemoryId(state),
-    scope: input.scope,
-    projectId: input.projectId ?? null,
-    threadId: input.threadId ?? null,
-    taskId: input.taskId ?? null,
-    agentId: input.agentId ?? null,
-    kind: input.kind,
-    body: input.body,
-    tags: input.tags ?? [],
-    createdAt: new Date().toISOString()
-  };
-  state.memories.push(memory);
-  appendEvent(state, {
-    type: "memory.recorded",
-    entityType: "system",
-    entityId: memory.id,
-    timestamp: memory.createdAt,
-    payload: {
-      scope: memory.scope,
-      projectId: memory.projectId,
-      threadId: memory.threadId,
-      taskId: memory.taskId,
-      agentId: memory.agentId,
-      kind: memory.kind
-    }
+  return addMemoryRecord(state, input, {
+    appendEvent,
+    nextMemoryId
   });
-  return memory;
 }
 
 export function respondToThread(
@@ -1151,24 +1042,10 @@ export function respondToThread(
 }
 
 export function createThread(state: RuntimeState, input: { title: string }): ThreadRecord {
-  const now = new Date().toISOString();
-  const thread: ThreadRecord = {
-    id: nextThreadId(state),
-    title: input.title,
-    taskIds: [],
-    messageIds: [],
-    createdAt: now,
-    updatedAt: now
-  };
-  state.threads.push(thread);
-  appendEvent(state, {
-    type: "thread.created",
-    entityType: "thread",
-    entityId: thread.id,
-    timestamp: now,
-    payload: { title: thread.title }
+  return createThreadRecord(state, input, {
+    appendEvent,
+    nextThreadId
   });
-  return thread;
 }
 
 export function addMessage(
@@ -1183,39 +1060,14 @@ export function addMessage(
   },
   routing?: RoutingPolicy
 ): MessageRecord {
-  const thread = state.threads.find((item) => item.id === input.threadId);
-  if (!thread) {
-    throw new Error(`Unknown thread id: ${input.threadId}`);
-  }
-  const policy = routing ?? defaultRoutingPolicy();
-  const targetedAgent = input.targetAgentId ?? resolveMentionedAgentId(state, input.body);
-  const message: MessageRecord = {
-    id: nextMessageId(state),
-    threadId: input.threadId,
-    role: input.role,
-    body: input.body,
-    routedProjectId: input.routedProjectId ?? inferProjectFromMessage(state, input.body, policy),
-    suggestedLane: input.suggestedLane ?? inferLaneFromMessage(input.body, policy),
-    targetAgentId: targetedAgent,
-    createdAt: new Date().toISOString()
-  };
-  state.messages.push(message);
-  thread.messageIds.push(message.id);
-  thread.updatedAt = message.createdAt;
-  appendEvent(state, {
-    type: "message.created",
-    entityType: "message",
-    entityId: message.id,
-    timestamp: message.createdAt,
-    payload: {
-      threadId: message.threadId,
-      role: message.role,
-      routedProjectId: message.routedProjectId,
-      suggestedLane: message.suggestedLane,
-      targetAgentId: message.targetAgentId
-    }
-  });
-  return message;
+  return addThreadDomainMessage(state, input, {
+    appendEvent,
+    defaultRoutingPolicy,
+    inferLaneFromMessage,
+    inferProjectFromMessage,
+    nextMessageId,
+    resolveMentionedAgentId
+  }, routing);
 }
 
 export function promoteMessageToTask(
@@ -1403,60 +1255,11 @@ export function createTask(
     dependsOnTaskIds?: string[];
   }
 ): TaskRecord {
-  const project = state.projects.find((item) => item.id === input.projectId);
-  if (!project) {
-    throw new Error(`Unknown project id: ${input.projectId}`);
-  }
-  if (!project.lanes.includes(input.lane)) {
-    throw new Error(`Lane ${input.lane} is not defined for project ${input.projectId}`);
-  }
-  const now = new Date().toISOString();
-  const id = nextTaskId(state);
-  const task: TaskRecord = {
-    id,
-    title: input.title,
-    description: input.description,
-    projectId: input.projectId,
-    lane: input.lane,
-    status: "new",
-    assigneeId: null,
-    parentTaskId: input.parentTaskId ?? null,
-    childTaskIds: [],
-    dependsOnTaskIds: input.dependsOnTaskIds ?? [],
-    artifactPaths: [],
-    externalRefs: [],
-    blockingReason: null,
-    needsApproval: false,
-    humanTakeover: false,
-    completionSummary: null,
-    createdAt: now,
-    updatedAt: now
-  };
-  state.tasks.push(task);
-  if (task.parentTaskId) {
-    const parent = state.tasks.find((item) => item.id === task.parentTaskId);
-    if (!parent) {
-      throw new Error(`Parent task ${task.parentTaskId} does not exist`);
-    }
-    if (!parent.childTaskIds.includes(task.id)) {
-      parent.childTaskIds.push(task.id);
-      parent.updatedAt = now;
-    }
-  }
-  appendEvent(state, {
-    type: "task.created",
-    entityType: "task",
-    entityId: task.id,
-    timestamp: now,
-    payload: {
-      projectId: task.projectId,
-      lane: task.lane,
-      title: task.title,
-      parentTaskId: task.parentTaskId
-    }
+  return createTaskRecord(state, input, {
+    appendEvent,
+    nextTaskId,
+    refreshTaskGraphState
   });
-  refreshTaskGraphState(state, task.id);
-  return task;
 }
 
 export function assignTask(
@@ -1465,42 +1268,10 @@ export function assignTask(
   state: RuntimeState,
   input: { taskId: string; agentId: string }
 ): TaskRecord {
-  const task = state.tasks.find((item) => item.id === input.taskId);
-  if (!task) {
-    throw new Error(`Unknown task id: ${input.taskId}`);
-  }
-  const agent = state.agents.find((item) => item.id === input.agentId);
-  if (!agent) {
-    throw new Error(`Unknown agent id: ${input.agentId}`);
-  }
-  if (!agent.assignedProjects.includes(task.projectId)) {
-    throw new Error(`Agent ${agent.id} is not assigned to project ${task.projectId}`);
-  }
-
-  if (requiresDesignHandoff(agent.role, task.lane)) {
-    const missing = validateDesignHandoffArtifacts(config, root, state, task.projectId);
-    if (missing.length > 0) {
-      throw new Error(
-        `Design handoff incomplete for project ${task.projectId}. Missing: ${missing.join(", ")}`
-      );
-    }
-  }
-
-  task.assigneeId = agent.id;
-  task.status = "assigned";
-  task.updatedAt = new Date().toISOString();
-  appendEvent(state, {
-    type: "task.assigned",
-    entityType: "task",
-    entityId: task.id,
-    timestamp: task.updatedAt,
-    payload: {
-      assigneeId: agent.id,
-      projectId: task.projectId,
-      lane: task.lane
-    }
+  return assignTaskRecord(config, root, state, input, {
+    appendEvent,
+    requiresDesignHandoff
   });
-  return task;
 }
 
 export function autoAssignTask(
@@ -1509,42 +1280,17 @@ export function autoAssignTask(
   state: RuntimeState,
   taskId: string
 ): { task: TaskRecord; agentId: string | null; error: string | null } {
-  const task = state.tasks.find((item) => item.id === taskId);
-  if (!task) {
-    throw new Error(`Unknown task id: ${taskId}`);
-  }
-  const routing = resolveRoutingPolicy(config);
-  const preferredAgent = selectAgentForTask(state, task, routing);
-  if (!preferredAgent) {
-    return { task, agentId: null, error: "No eligible agent found for this task." };
-  }
-  try {
-    const assigned = assignTask(config, root, state, { taskId, agentId: preferredAgent.id });
-    return { task: assigned, agentId: preferredAgent.id, error: null };
-  } catch (error) {
-    return { task, agentId: null, error: error instanceof Error ? error.message : String(error) };
-  }
+  return autoAssignTaskRecord(config, root, state, taskId, {
+    appendEvent,
+    requiresDesignHandoff,
+    selectAgentForTask
+  });
 }
 
 export function updateTaskStatus(state: RuntimeState, input: { taskId: string; status: string }): TaskRecord {
-  const task = state.tasks.find((item) => item.id === input.taskId);
-  if (!task) {
-    throw new Error(`Unknown task id: ${input.taskId}`);
-  }
-  task.status = input.status;
-  task.updatedAt = new Date().toISOString();
-  appendEvent(state, {
-    type: "task.status_updated",
-    entityType: "task",
-    entityId: task.id,
-    timestamp: task.updatedAt,
-    payload: {
-      status: task.status,
-      projectId: task.projectId,
-      lane: task.lane
-    }
+  return updateTaskStatusRecord(state, input, {
+    appendEvent
   });
-  return task;
 }
 
 export function handoffTask(
@@ -2237,54 +1983,17 @@ export function validateDesignHandoffArtifacts(
   state: RuntimeState,
   projectId: string
 ): string[] {
-  const project = state.projects.find((item) => item.id === projectId);
-  if (!project) {
-    throw new Error(`Unknown project id: ${projectId}`);
-  }
-  const repoSlug = project.repoSlug;
-  if (!repoSlug) {
-    return ["repo slug missing"];
-  }
-
-  const runtime = asMap(config.runtime);
-  const repoRoot = typeof runtime?.repo_root === "string" ? runtime.repo_root : "./repos";
-  const basePath = resolve(root, repoRoot, repoSlug);
-
-  const requiredPaths = [
-    "design-system/MASTER.md",
-    "plans/design/design-plan.md",
-    "plans/design/dev-handoff.md"
-  ];
-
-  return requiredPaths.filter((relativePath) => {
-    try {
-      readFileSync(resolve(basePath, relativePath), "utf8");
-      return false;
-    } catch {
-      return true;
-    }
-  });
+  return validateDesignHandoffArtifactsRecord(config, root, state, projectId);
 }
 
 function createExecutionTasksFromLanes(
   state: RuntimeState,
   input: { projectId: string; body: string; parentTaskId: string; threadId: string; requestedLanes: string[] }
 ): TaskRecord[] {
-  const tasks: TaskRecord[] = [];
-  let previousTaskId: string | null = null;
-  for (const lane of input.requestedLanes) {
-    const task = createTask(state, {
-      projectId: input.projectId,
-      title: `${capitalizeLane(lane)}: ${deriveTaskTitle(input.body)}`,
-      description: input.body,
-      lane,
-      parentTaskId: input.parentTaskId,
-      dependsOnTaskIds: previousTaskId ? [previousTaskId] : []
-    });
-    tasks.push(task);
-    previousTaskId = task.id;
-  }
-  return tasks;
+  return createLaneExecutionTasks(state, input, {
+    createTask,
+    deriveTaskTitle
+  });
 }
 
 function deriveRequestedLanes(
@@ -2294,119 +2003,41 @@ function deriveRequestedLanes(
   preferredLane: string | undefined,
   routing: RoutingPolicy
 ): string[] {
-  const project = state.projects.find((item) => item.id === projectId);
-  const allowed = new Set(project?.lanes ?? []);
-  const inferred = new Set<string>();
-  const lowered = body.toLowerCase();
-  const baseLane = preferredLane ?? inferLaneFromMessage(body, routing);
-  if (allowed.has(baseLane)) {
-    inferred.add(baseLane);
-  }
-  if (/\b(plan|scope|spec|define)\b/.test(lowered) && allowed.has("planning")) {
-    inferred.add("planning");
-  }
-  if (/\b(research|investigate|compare|reference|competitor)\b/.test(lowered) && allowed.has("research")) {
-    inferred.add("research");
-  }
-  if (/\b(design|redesign|ux|ui|layout|dashboard|wireframe|system)\b/.test(lowered) && allowed.has("design")) {
-    inferred.add("design");
-  }
-  if (/\b(build|implement|develop|code|publish|frontend|ship)\b/.test(lowered) && allowed.has("build")) {
-    inferred.add("build");
-  }
-  if (/\b(review|qa|check|inspect|validate)\b/.test(lowered) && allowed.has("review")) {
-    inferred.add("review");
-  }
-
-  const ordered = ["research", "design", "build", "review"].filter((lane) => inferred.has(lane));
-  if (ordered.length > 0) {
-    return ordered;
-  }
-  return [baseLane];
+  return inferRequestedLanes(state, projectId, body, preferredLane, routing, {
+    inferLaneFromMessage
+  });
 }
 
 function getOrderedThreadTasks(state: RuntimeState, threadId: string): TaskRecord[] {
-  const detail = getThreadDetail(state, threadId);
-  return detail.tasks.slice().sort((left, right) => {
-    if (left.parentTaskId === null && right.parentTaskId !== null) {
-      return -1;
-    }
-    if (left.parentTaskId !== null && right.parentTaskId === null) {
-      return 1;
-    }
-    return left.createdAt.localeCompare(right.createdAt);
+  return getOrderedTasksForThread(state, threadId, {
+    getThreadDetail
   });
 }
 
 function findNextReadyChildTask(state: RuntimeState, threadId: string): TaskRecord | null {
-  return getOrderedThreadTasks(state, threadId).find((task) => task.parentTaskId !== null && !isTaskComplete(task) && dependenciesSatisfied(state, task)) ?? null;
-}
-
-function dependenciesSatisfied(state: RuntimeState, task: TaskRecord): boolean {
-  return task.dependsOnTaskIds.every((taskId) => {
-    const dependency = state.tasks.find((item) => item.id === taskId);
-    return dependency ? isTaskComplete(dependency) : false;
+  return findNextReadyThreadChildTask(state, threadId, {
+    getThreadDetail
   });
 }
 
-function refreshTaskGraphState(state: RuntimeState, taskId: string): void {
-  const task = state.tasks.find((item) => item.id === taskId);
-  if (!task) {
-    return;
-  }
-  if (!task.parentTaskId) {
-    return;
-  }
-  const parent = state.tasks.find((item) => item.id === task.parentTaskId);
-  if (!parent) {
-    return;
-  }
-  const children = parent.childTaskIds
-    .map((childId) => state.tasks.find((item) => item.id === childId))
-    .filter((child): child is TaskRecord => Boolean(child));
-  if (children.length === 0) {
-    return;
-  }
-  if (children.every((child) => isTaskComplete(child))) {
-    parent.status = "done";
-    parent.completionSummary = summarizeParentCompletion(children);
-  } else if (children.some((child) => isTaskBlocked(child))) {
-    parent.status = "blocked";
-    parent.blockingReason = children.find((child) => isTaskBlocked(child))?.blockingReason ?? "child task blocked";
-  } else if (children.some((child) => child.status === "review_requested")) {
-    parent.status = "review_requested";
-  } else if (children.some((child) => child.status === "consulting" || child.status === "waiting")) {
-    parent.status = "waiting";
-  } else {
-    parent.status = "in_progress";
-    parent.blockingReason = null;
-  }
-  parent.updatedAt = new Date().toISOString();
-  if (parent.parentTaskId) {
-    refreshTaskGraphState(state, parent.id);
-  }
+function dependenciesSatisfied(state: RuntimeState, task: TaskRecord): boolean {
+  return areDependenciesSatisfied(state, task);
 }
 
-function summarizeParentCompletion(children: TaskRecord[]): string {
-  const completedLanes = children.map((child) => child.lane).join(", ");
-  return `Completed child lanes: ${completedLanes}.`;
+function refreshTaskGraphState(state: RuntimeState, taskId: string): void {
+  refreshWorkflowTaskGraphState(state, taskId);
 }
 
 function isTaskComplete(task: TaskRecord): boolean {
-  return ["reported", "done"].includes(task.status);
+  return isWorkflowTaskComplete(task);
 }
 
 function isTaskBlocked(task: TaskRecord): boolean {
-  return ["blocked", "waiting", "consulting"].includes(task.status) || task.needsApproval;
+  return isWorkflowTaskBlocked(task);
 }
 
 function autoReviewTarget(state: RuntimeState, task: TaskRecord): RuntimeAgent | null {
-  return state.agents.find((agent) => {
-    if (!agent.assignedProjects.includes(task.projectId)) {
-      return false;
-    }
-    return ["publishing", "coordination", "build"].includes(agent.role) && agent.id !== task.assigneeId;
-  }) ?? null;
+  return findAutoReviewTarget(state, task) as RuntimeAgent | null;
 }
 
 function resolveMentionedAgentId(state: RuntimeState, body: string): string | null {
@@ -2841,19 +2472,11 @@ function safeCounterValue(value: unknown, fallback: number): number {
 }
 
 function requiresDesignHandoff(role: string, lane: string): boolean {
-  return ["build", "publishing"].includes(role) || ["build", "review", "todo", "in_progress"].includes(lane);
+  return needsDesignHandoff(role, lane);
 }
 
 function selectAgentForTask(state: RuntimeState, task: TaskRecord, routing: RoutingPolicy): RuntimeAgent | null {
-  const candidates = state.agents.filter((agent) => agent.assignedProjects.includes(task.projectId));
-  const preferredRoles = routing.preferredRoles[task.lane] ?? preferredRolesForLane(task.lane);
-  for (const role of preferredRoles) {
-    const match = candidates.find((agent) => agent.role === role);
-    if (match) {
-      return match;
-    }
-  }
-  return candidates[0] ?? null;
+  return chooseAgentForTask(state, task, routing) as RuntimeAgent | null;
 }
 
 function inferProjectFromMessage(state: RuntimeState, body: string, routing: RoutingPolicy): string | null {
@@ -2893,49 +2516,8 @@ function matchesAny(value: string, candidates: string[]): boolean {
   return candidates.some((candidate) => value.includes(candidate));
 }
 
-function preferredRolesForLane(lane: string): string[] {
-  switch (lane) {
-    case "design":
-      return ["design", "coordination"];
-    case "build":
-      return ["build", "publishing"];
-    case "review":
-      return ["publishing", "build", "coordination"];
-    case "research":
-    case "planning":
-      return ["coordination", "design"];
-    default:
-      return ["coordination"];
-  }
-}
-
 function nextStatusForWorkTurn(lane: string, status: string): string {
-  if (lane === "review") {
-    switch (status) {
-      case "new":
-      case "assigned":
-        return "review";
-      case "review":
-      case "in_progress":
-        return "done";
-      case "done":
-        return "done";
-      default:
-        return "review";
-    }
-  }
-  switch (status) {
-    case "new":
-    case "assigned":
-      return "in_progress";
-    case "in_progress":
-      return "review";
-    case "review":
-    case "done":
-      return status;
-    default:
-      return "in_progress";
-  }
+  return getNextStatusForWorkTurn(lane, status);
 }
 
 function workTurnMessage(
@@ -2945,13 +2527,7 @@ function workTurnMessage(
   nextStatus: string,
   artifacts: { artifactPaths: string[]; summary: string }
 ): string {
-  if (nextStatus === "in_progress") {
-    return `${agentName} picked up ${task.title} as the ${role} agent and is now working on the ${task.lane} lane. ${artifacts.summary} Artifacts: ${artifacts.artifactPaths.join(", ")}`;
-  }
-  if (nextStatus === "review") {
-    return `${agentName} completed the current work turn for ${task.title} and moved it to review. ${artifacts.summary} Artifacts: ${artifacts.artifactPaths.join(", ")}`;
-  }
-  return `${agentName} checked ${task.title} and kept it in ${nextStatus}. ${artifacts.summary}`;
+  return composeWorkTurnMessage(agentName, role, task, nextStatus, artifacts);
 }
 
 function defaultRoutingPolicy(): RoutingPolicy {
@@ -2973,82 +2549,6 @@ function defaultRoutingPolicy(): RoutingPolicy {
       review: ["publishing", "build", "coordination"]
     }
   };
-}
-
-function scoreMemory(
-  memory: MemoryRecord,
-  input: { projectId?: string; threadId?: string; taskId?: string; query?: string },
-  queryTokens: string[]
-): number {
-  let score = 0;
-  if (input.projectId && memory.projectId === input.projectId) {
-    score += 3;
-  }
-  if (input.threadId && memory.threadId === input.threadId) {
-    score += 5;
-  }
-  if (input.taskId && memory.taskId === input.taskId) {
-    score += 4;
-  }
-
-  if (queryTokens.length > 0) {
-    const haystack = tokenize(`${memory.body} ${memory.tags.join(" ")}`);
-    const overlaps = queryTokens.filter((token) => haystack.includes(token));
-    score += overlaps.length * 2;
-  }
-
-  if (memory.kind === "follow_up") {
-    score += 1;
-  }
-
-  return score;
-}
-
-function dedupeRecommendedMemories(memories: RecommendedMemory[]): RecommendedMemory[] {
-  const seen = new Set<string>();
-  const result: RecommendedMemory[] = [];
-
-  for (const memory of memories) {
-    const key = `${memory.kind}:${memory.body.trim().toLowerCase()}`;
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    result.push(memory);
-  }
-
-  return result;
-}
-
-function scoreTask(
-  task: TaskRecord,
-  queryTokens: string[],
-  input: { projectId?: string; threadId?: string; taskId?: string; query?: string }
-): number {
-  let score = 0;
-
-  if (input.projectId && task.projectId === input.projectId) {
-    score += 4;
-  }
-
-  const haystack = tokenize(`${task.title} ${task.description} ${task.lane} ${task.status}`);
-  if (queryTokens.length > 0) {
-    const overlaps = queryTokens.filter((token) => haystack.includes(token));
-    score += overlaps.length * 2;
-  }
-
-  if (task.status === "done" || task.status === "review") {
-    score += 1;
-  }
-
-  return score;
-}
-
-function tokenize(value: string): string[] {
-  return value
-    .toLowerCase()
-    .split(/[^a-z0-9_]+/g)
-    .filter((token) => token.length >= 3);
 }
 
 function normalizeMessages(messages: MessageRecord[]): MessageRecord[] {
@@ -3154,16 +2654,7 @@ function ensureExternalSyncApproval(
 }
 
 function findConfiguredActor(config: JSONObject, actorId: string): { id: string; role: string } {
-  const auth = asMap(config.auth);
-  const localUsers = Array.isArray(auth?.local_users) ? auth.local_users : [];
-  const actor = localUsers.find((entry) => asMap(entry)?.id === actorId);
-  if (!actor) {
-    throw new Error(`Unknown actor id: ${actorId}`);
-  }
-  return {
-    id: actorId,
-    role: typeof asMap(actor)?.role === "string" ? String(asMap(actor)?.role) : "observer"
-  };
+  return findConfiguredSessionActor(config, actorId);
 }
 
 function ensureConnectorEnabled(config: JSONObject, provider: "telegram" | "discord" | "slack"): void {
