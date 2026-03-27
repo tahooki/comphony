@@ -1,10 +1,13 @@
 export type Command =
   | { kind: "init"; force: boolean }
   | { kind: "validate" }
+  | { kind: "smoke-test"; projectId?: string }
   | { kind: "server-start" }
   | { kind: "project-list" }
   | { kind: "project-overview" }
   | { kind: "project-create"; projectId: string; name: string; purpose?: string; lanes: string[]; repoSlug?: string }
+  | { kind: "project-provision"; projectId: string; name: string; purpose?: string; lanes: string[]; repoSlug?: string; repoPath?: string; defaultBranch?: string; bootstrapStrategy?: "clone" | "worktree" }
+  | { kind: "workflow-generate"; projectId: string; defaultBranch?: string; bootstrapStrategy?: "clone" | "worktree" }
   | { kind: "agent-list"; projectId?: string }
   | { kind: "agent-catalog" }
   | { kind: "people-list" }
@@ -68,6 +71,13 @@ export const COMMAND_REGISTRY: CommandEntry[] = [
     parse: (_argv, _index, configPath) => ({ configPath, command: { kind: "validate" } })
   },
   {
+    match: (argv, index) => argv[index] === "smoke-test",
+    parse: (argv, index, configPath) => {
+      const args = argv.slice(index + 1);
+      return { configPath, command: { kind: "smoke-test", projectId: getOptionValue(args, "--project") } };
+    }
+  },
+  {
     match: (argv, index) => argv[index] === "server" && argv[index + 1] === "start",
     parse: (_argv, _index, configPath) => ({ configPath, command: { kind: "server-start" } })
   },
@@ -93,6 +103,42 @@ export const COMMAND_REGISTRY: CommandEntry[] = [
           purpose: getOptionValue(args, "--purpose"),
           lanes: rawLanes.split(",").map((lane) => lane.trim()).filter(Boolean),
           repoSlug: getOptionValue(args, "--repo-slug")
+        }
+      };
+    }
+  },
+  {
+    match: (argv, index) => argv[index] === "project" && argv[index + 1] === "provision",
+    parse: (argv, index, configPath) => {
+      const args = argv.slice(index + 2);
+      const rawLanes = requireOptionValue(args, "--lanes");
+      return {
+        configPath,
+        command: {
+          kind: "project-provision",
+          projectId: requireOptionValue(args, "--id"),
+          name: requireOptionValue(args, "--name"),
+          purpose: getOptionValue(args, "--purpose"),
+          lanes: rawLanes.split(",").map((lane) => lane.trim()).filter(Boolean),
+          repoSlug: getOptionValue(args, "--repo-slug"),
+          repoPath: getOptionValue(args, "--repo-path"),
+          defaultBranch: getOptionValue(args, "--default-branch"),
+          bootstrapStrategy: parseBootstrapStrategy(getOptionValue(args, "--bootstrap-strategy"))
+        }
+      };
+    }
+  },
+  {
+    match: (argv, index) => argv[index] === "workflow" && argv[index + 1] === "generate",
+    parse: (argv, index, configPath) => {
+      const args = argv.slice(index + 2);
+      return {
+        configPath,
+        command: {
+          kind: "workflow-generate",
+          projectId: requireOptionValue(args, "--project"),
+          defaultBranch: getOptionValue(args, "--default-branch"),
+          bootstrapStrategy: parseBootstrapStrategy(getOptionValue(args, "--bootstrap-strategy"))
         }
       };
     }
@@ -488,4 +534,14 @@ function requireOptionValue(args: string[], name: string): string {
     throw new Error(`Missing value after ${name}`);
   }
   return value;
+}
+
+function parseBootstrapStrategy(value?: string): "clone" | "worktree" | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === "clone" || value === "worktree") {
+    return value;
+  }
+  throw new Error("--bootstrap-strategy must be clone or worktree");
 }

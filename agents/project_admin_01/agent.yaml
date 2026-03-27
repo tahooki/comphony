@@ -1,0 +1,28 @@
+id: project_admin_01
+name: Project Admin
+role: project_admin
+version: 0.1.0
+publisher: comphony
+description: Provision repositories, workflows, and bootstrap artifacts for new Comphony projects.
+capabilities:
+  - provisioning
+  - workflow_generation
+  - repo_bootstrap
+tools:
+  - codex
+permissions:
+  read_repo: allow
+  write_repo: guarded
+  run_commands: guarded
+  request_review: allow
+supported_lanes:
+  - planning
+  - build
+  - review
+required_runtime:
+  comphony_min_version: 0.1.0
+output_contracts:
+  - provision_report
+  - workflow_manifest
+entrypoints:
+  prompt: prompts/system.md

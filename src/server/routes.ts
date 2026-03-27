@@ -91,6 +91,61 @@ type Route<TState> = {
   handle: (context: ServerContext<TState>) => void;
 };
 
+export const GET_ROUTE_SURFACE = [
+  "/",
+  "/app",
+  "/healthz",
+  "/v1/status",
+  "/v1/auth/session",
+  "/v1/projects",
+  "/v1/projects/overview",
+  "/v1/sync",
+  "/v1/agents",
+  "/v1/agents/catalog",
+  "/v1/people",
+  "/v1/sessions",
+  "/v1/tasks",
+  "/v1/tasks/recommend",
+  "/v1/events/stream",
+  "/v1/events",
+  "/v1/memory",
+  "/v1/memory/recommend",
+  "/v1/consultations",
+  "/v1/reviews",
+  "/v1/approvals",
+  "/v1/threads",
+  "/v1/threads/:id",
+  "/v1/messages"
+] as const;
+
+export const POST_ROUTE_SURFACE = [
+  "/v1/intake",
+  "/v1/threads",
+  "/v1/threads/respond",
+  "/v1/threads/continue",
+  "/v1/messages",
+  "/v1/messages/promote",
+  "/v1/tasks/assign",
+  "/v1/tasks/status",
+  "/v1/tasks/work",
+  "/v1/tasks/handoff",
+  "/v1/tasks/sync",
+  "/v1/tasks/consult",
+  "/v1/consultations/resolve",
+  "/v1/tasks/review",
+  "/v1/reviews/complete",
+  "/v1/approvals/request",
+  "/v1/approvals/decide",
+  "/v1/projects",
+  "/v1/agents/install",
+  "/v1/agents/assign-project",
+  "/v1/sync/retry",
+  "/v1/sync/push",
+  "/v1/auth/login",
+  "/v1/auth/logout",
+  "/v1/connectors/:provider/messages"
+] as const;
+
 export function createGetRoutes<TState>(deps: ServerDeps<TState>): Route<TState>[] {
   return [
     {

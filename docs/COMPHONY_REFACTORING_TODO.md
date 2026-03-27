@@ -39,38 +39,38 @@ The main target is over-centralized responsibility across a few large files.
 - [x] Move `respondToThread` into a dedicated orchestrator module.
 - [x] Move `resolveConversationAction` into a dedicated command intent module.
 - [x] Move auto-continue loop behavior into an orchestrator loop module.
-- [ ] Keep direct agent mention behavior and manager reply behavior compatible with current tests.
+- [x] Keep direct agent mention behavior and manager reply behavior compatible with current tests.
 
 ## Priority 3
 
 - [x] Refactor `src/server.ts` so route registration is declarative.
 - [x] Introduce a shared mutation wrapper for auth, execute, save, broadcast, and respond.
 - [x] Group routes by resource instead of keeping them in one long request handler.
-- [ ] Keep the current `/v1/*` endpoint surface unchanged.
+- [x] Keep the current `/v1/*` endpoint surface unchanged.
 
 ## Priority 4
 
-- [ ] Refactor `src/cli.ts` to use a command registry instead of a long manual parser chain.
-- [ ] Co-locate each command spec with its handler.
-- [ ] Reduce `parseArgs` to dispatch logic only.
-- [ ] Keep the current command names and flags compatible.
+- [x] Refactor `src/cli.ts` to use a command registry instead of a long manual parser chain.
+- [x] Co-locate each command spec with its handler.
+- [x] Reduce `parseArgs` to dispatch logic only.
+- [x] Keep the current command names and flags compatible.
 
 ## Priority 5
 
-- [ ] Split `src/web.ts` into separate concerns.
-- [ ] Move static HTML shell markup out of the main client logic block.
-- [ ] Move client state management into a dedicated module.
-- [ ] Move rendering functions into dedicated view modules.
-- [ ] Move fetch helpers and event-stream wiring into dedicated client API modules.
-- [ ] Preserve the current UI tabs, task actions, and event stream behavior.
+- [x] Split `src/web.ts` into separate concerns.
+- [x] Move static HTML shell markup out of the main client logic block.
+- [x] Move client state management into a dedicated module.
+- [x] Move rendering functions into dedicated view modules.
+- [x] Move fetch helpers and event-stream wiring into dedicated client API modules.
+- [x] Preserve the current UI tabs, task actions, and event stream behavior.
 
 ## Priority 6
 
-- [ ] Extract Linear sync code out of `src/state.ts`.
-- [ ] Extract Supabase sync code out of `src/state.ts`.
-- [ ] Introduce adapter boundaries for external providers.
-- [ ] Standardize provider error handling and retry behavior.
-- [ ] Add mock-friendly integration tests around provider adapters.
+- [x] Extract Linear sync code out of `src/state.ts`.
+- [x] Extract Supabase sync code out of `src/state.ts`.
+- [x] Introduce adapter boundaries for external providers.
+- [x] Standardize provider error handling and retry behavior.
+- [x] Add mock-friendly integration tests around provider adapters.
 
 ## Verification Checklist
 

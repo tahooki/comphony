@@ -1,5 +1,6 @@
 import type { JSONObject } from "../config.js";
 import { resolveRoutingPolicy } from "../config.js";
+import { TASK_STATUS } from "./task-policy.js";
 
 type RuntimeAgentLike = {
   id: string;
@@ -50,6 +51,22 @@ type ConsultationRecordLike = {
   updatedAt: string;
 };
 
+type HandoffRecordLike = {
+  id: string;
+  taskId: string;
+  threadId: string;
+  fromLane: string;
+  toLane: string;
+  fromAgentId: string | null;
+  toAgentId: string | null;
+  reason: string | null;
+  instructions: string | null;
+  status: "completed" | "pending_assignment";
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+};
+
 type ReviewRecordLike = {
   id: string;
   taskId: string;
@@ -84,6 +101,7 @@ type RuntimeStateLike = {
   agents: RuntimeAgentLike[];
   tasks: TaskRecordLike[];
   threads: ThreadRecordLike[];
+  handoffs: HandoffRecordLike[];
   consultations: ConsultationRecordLike[];
   reviews: ReviewRecordLike[];
   approvals: ApprovalRecordLike[];
@@ -103,6 +121,7 @@ type CollaborationDeps<
   TThread extends ThreadRecordLike,
   TMessage extends MessageRecordLike,
   TAgent extends RuntimeAgentLike,
+  THandoff extends HandoffRecordLike,
   TConsultation extends ConsultationRecordLike,
   TReview extends ReviewRecordLike,
   TApproval extends ApprovalRecordLike
@@ -139,6 +158,7 @@ type CollaborationDeps<
   findThreadByTask: (state: TState, taskId: string) => TThread;
   nextApprovalId: (state: TState) => string;
   nextConsultationId: (state: TState) => string;
+  nextHandoffId: (state: TState) => string;
   nextReviewId: (state: TState) => string;
   refreshTaskGraphState: (state: TState, taskId: string) => void;
 };
@@ -149,6 +169,7 @@ export function handoffTask<
   TThread extends ThreadRecordLike,
   TMessage extends MessageRecordLike,
   TAgent extends RuntimeAgentLike,
+  THandoff extends HandoffRecordLike,
   TConsultation extends ConsultationRecordLike,
   TReview extends ReviewRecordLike,
   TApproval extends ApprovalRecordLike
@@ -156,9 +177,9 @@ export function handoffTask<
   config: JSONObject,
   root: string,
   state: TState,
-  input: { taskId: string; lane: string },
-  deps: CollaborationDeps<TState, TTask, TThread, TMessage, TAgent, TConsultation, TReview, TApproval>
-): { task: TTask; threadId: string; message: TMessage; agentId: string | null; error: string | null } {
+  input: { taskId: string; lane: string; reason?: string; instructions?: string },
+  deps: CollaborationDeps<TState, TTask, TThread, TMessage, TAgent, THandoff, TConsultation, TReview, TApproval>
+): { handoff: THandoff; task: TTask; threadId: string; message: TMessage; agentId: string | null; error: string | null } {
   const task = state.tasks.find((item) => item.id === input.taskId);
   if (!task) {
     throw new Error(`Unknown task id: ${input.taskId}`);
@@ -176,7 +197,7 @@ export function handoffTask<
   const previousAssigneeId = task.assigneeId;
   const now = new Date().toISOString();
   task.lane = input.lane;
-  task.status = "new";
+  task.status = TASK_STATUS.triaged;
   task.assigneeId = null;
   task.updatedAt = now;
   resolvedThread.updatedAt = now;
@@ -203,6 +224,22 @@ export function handoffTask<
   });
 
   const assigned = deps.autoAssignTask(config, root, state, task.id);
+  const handoff = {
+    id: deps.nextHandoffId(state),
+    taskId: task.id,
+    threadId: resolvedThread.id,
+    fromLane: previousLane,
+    toLane: input.lane,
+    fromAgentId: previousAssigneeId,
+    toAgentId: assigned.agentId,
+    reason: input.reason ?? null,
+    instructions: input.instructions ?? null,
+    status: assigned.agentId ? "completed" : "pending_assignment",
+    createdAt: now,
+    updatedAt: now,
+    completedAt: assigned.agentId ? now : null
+  } as THandoff;
+  state.handoffs.push(handoff);
   message.body = assigned.agentId
     ? `Comphony handed off ${task.title} from ${previousLane} to ${input.lane} and assigned ${assigned.agentId}.`
     : `Comphony handed off ${task.title} from ${previousLane} to ${input.lane} but no eligible agent was available.`;
@@ -219,6 +256,7 @@ export function handoffTask<
   deps.refreshTaskGraphState(state, task.id);
 
   return {
+    handoff,
     task: task as TTask,
     threadId: resolvedThread.id,
     message,
@@ -233,6 +271,7 @@ export function requestConsultation<
   TThread extends ThreadRecordLike,
   TMessage extends MessageRecordLike,
   TAgent extends RuntimeAgentLike,
+  THandoff extends HandoffRecordLike,
   TConsultation extends ConsultationRecordLike,
   TReview extends ReviewRecordLike,
   TApproval extends ApprovalRecordLike
@@ -240,7 +279,7 @@ export function requestConsultation<
   config: JSONObject,
   state: TState,
   input: { taskId: string; toAgentId: string; reason: string; instructions?: string },
-  deps: CollaborationDeps<TState, TTask, TThread, TMessage, TAgent, TConsultation, TReview, TApproval>
+  deps: CollaborationDeps<TState, TTask, TThread, TMessage, TAgent, THandoff, TConsultation, TReview, TApproval>
 ): { consultation: TConsultation; task: TTask; threadId: string; message: TMessage } {
   const task = deps.findTask(state, input.taskId);
   const thread = deps.findThreadByTask(state, task.id);
@@ -264,7 +303,7 @@ export function requestConsultation<
     updatedAt: now
   } as TConsultation;
   state.consultations.push(consultation);
-  task.status = "consulting";
+  task.status = TASK_STATUS.consulting;
   task.blockingReason = input.reason;
   task.updatedAt = now;
   thread.updatedAt = now;
@@ -310,6 +349,7 @@ export function resolveConsultation<
   TThread extends ThreadRecordLike,
   TMessage extends MessageRecordLike,
   TAgent extends RuntimeAgentLike,
+  THandoff extends HandoffRecordLike,
   TConsultation extends ConsultationRecordLike,
   TReview extends ReviewRecordLike,
   TApproval extends ApprovalRecordLike
@@ -317,7 +357,7 @@ export function resolveConsultation<
   config: JSONObject,
   state: TState,
   input: { consultationId: string; response: string },
-  deps: CollaborationDeps<TState, TTask, TThread, TMessage, TAgent, TConsultation, TReview, TApproval>
+  deps: CollaborationDeps<TState, TTask, TThread, TMessage, TAgent, THandoff, TConsultation, TReview, TApproval>
 ): { consultation: TConsultation; task: TTask; threadId: string; message: TMessage } {
   const consultation = state.consultations.find((item) => item.id === input.consultationId);
   if (!consultation) {
@@ -329,7 +369,7 @@ export function resolveConsultation<
   consultation.status = "answered";
   consultation.response = input.response;
   consultation.updatedAt = now;
-  task.status = "in_progress";
+  task.status = TASK_STATUS.inProgress;
   task.blockingReason = null;
   task.updatedAt = now;
   thread.updatedAt = now;
@@ -374,6 +414,7 @@ export function requestTaskReview<
   TThread extends ThreadRecordLike,
   TMessage extends MessageRecordLike,
   TAgent extends RuntimeAgentLike,
+  THandoff extends HandoffRecordLike,
   TConsultation extends ConsultationRecordLike,
   TReview extends ReviewRecordLike,
   TApproval extends ApprovalRecordLike
@@ -381,7 +422,7 @@ export function requestTaskReview<
   config: JSONObject,
   state: TState,
   input: { taskId: string; reviewerAgentId: string; reason: string },
-  deps: CollaborationDeps<TState, TTask, TThread, TMessage, TAgent, TConsultation, TReview, TApproval>
+  deps: CollaborationDeps<TState, TTask, TThread, TMessage, TAgent, THandoff, TConsultation, TReview, TApproval>
 ): { review: TReview; task: TTask; threadId: string; message: TMessage } {
   const task = deps.findTask(state, input.taskId);
   const thread = deps.findThreadByTask(state, task.id);
@@ -405,7 +446,7 @@ export function requestTaskReview<
     updatedAt: now
   } as TReview;
   state.reviews.push(review);
-  task.status = "review_requested";
+  task.status = TASK_STATUS.reviewRequested;
   task.updatedAt = now;
   thread.updatedAt = now;
 
@@ -449,6 +490,7 @@ export function completeTaskReview<
   TThread extends ThreadRecordLike,
   TMessage extends MessageRecordLike,
   TAgent extends RuntimeAgentLike,
+  THandoff extends HandoffRecordLike,
   TConsultation extends ConsultationRecordLike,
   TReview extends ReviewRecordLike,
   TApproval extends ApprovalRecordLike
@@ -456,7 +498,7 @@ export function completeTaskReview<
   config: JSONObject,
   state: TState,
   input: { reviewId: string; outcome: "approved" | "changes_requested"; notes?: string },
-  deps: CollaborationDeps<TState, TTask, TThread, TMessage, TAgent, TConsultation, TReview, TApproval>
+  deps: CollaborationDeps<TState, TTask, TThread, TMessage, TAgent, THandoff, TConsultation, TReview, TApproval>
 ): { review: TReview; task: TTask; threadId: string; message: TMessage } {
   const review = state.reviews.find((item) => item.id === input.reviewId);
   if (!review) {
@@ -469,7 +511,7 @@ export function completeTaskReview<
   review.notes = input.notes ?? null;
   review.status = input.outcome;
   review.updatedAt = now;
-  task.status = input.outcome === "approved" ? "reported" : "in_progress";
+  task.status = input.outcome === "approved" ? TASK_STATUS.reported : TASK_STATUS.inProgress;
   task.completionSummary = input.outcome === "approved"
     ? input.notes ?? `Review approved for ${task.title}.`
     : input.notes ?? `Changes requested for ${task.title}.`;
@@ -518,6 +560,7 @@ export function requestApproval<
   TThread extends ThreadRecordLike,
   TMessage extends MessageRecordLike,
   TAgent extends RuntimeAgentLike,
+  THandoff extends HandoffRecordLike,
   TConsultation extends ConsultationRecordLike,
   TReview extends ReviewRecordLike,
   TApproval extends ApprovalRecordLike
@@ -525,7 +568,7 @@ export function requestApproval<
   config: JSONObject,
   state: TState,
   input: { action: string; reason: string; taskId?: string; requestedBy?: string | null },
-  deps: CollaborationDeps<TState, TTask, TThread, TMessage, TAgent, TConsultation, TReview, TApproval>
+  deps: CollaborationDeps<TState, TTask, TThread, TMessage, TAgent, THandoff, TConsultation, TReview, TApproval>
 ): { approval: TApproval; task: TTask | null; threadId: string | null; message: TMessage | null } {
   const task = input.taskId ? deps.findTask(state, input.taskId) : null;
   const thread = task ? deps.findThreadByTask(state, task.id) : null;
@@ -549,7 +592,7 @@ export function requestApproval<
   let message: TMessage | null = null;
   if (task && thread) {
     task.needsApproval = true;
-    task.status = "waiting";
+    task.status = TASK_STATUS.waiting;
     task.blockingReason = input.reason;
     task.updatedAt = now;
     thread.updatedAt = now;
@@ -586,6 +629,7 @@ export function decideApproval<
   TThread extends ThreadRecordLike,
   TMessage extends MessageRecordLike,
   TAgent extends RuntimeAgentLike,
+  THandoff extends HandoffRecordLike,
   TConsultation extends ConsultationRecordLike,
   TReview extends ReviewRecordLike,
   TApproval extends ApprovalRecordLike
@@ -593,7 +637,7 @@ export function decideApproval<
   config: JSONObject,
   state: TState,
   input: { approvalId: string; decision: "granted" | "denied"; actorId?: string | null; notes?: string },
-  deps: CollaborationDeps<TState, TTask, TThread, TMessage, TAgent, TConsultation, TReview, TApproval>
+  deps: CollaborationDeps<TState, TTask, TThread, TMessage, TAgent, THandoff, TConsultation, TReview, TApproval>
 ): { approval: TApproval; task: TTask | null; threadId: string | null; message: TMessage | null } {
   const approval = state.approvals.find((item) => item.id === input.approvalId);
   if (!approval) {
@@ -614,9 +658,9 @@ export function decideApproval<
     task.updatedAt = now;
     if (input.decision === "granted") {
       task.blockingReason = null;
-      task.status = approval.resumeStatus ?? "triaged";
+      task.status = approval.resumeStatus ?? TASK_STATUS.triaged;
     } else {
-      task.status = "blocked";
+      task.status = TASK_STATUS.blocked;
       task.blockingReason = input.notes ?? approval.reason;
     }
     deps.refreshTaskGraphState(state, task.id);

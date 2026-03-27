@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 import type { JSONObject } from "../config.js";
 import { resolveRoutingPolicy, type RoutingPolicy } from "../config.js";
+import { TASK_STATUS } from "./task-policy.js";
 
 type RuntimeProjectLike = {
   id: string;
@@ -93,7 +94,7 @@ export function createTask<TState extends RuntimeStateLike, TTask extends TaskRe
     description: input.description,
     projectId: input.projectId,
     lane: input.lane,
-    status: "new",
+    status: TASK_STATUS.new,
     assigneeId: null,
     parentTaskId: input.parentTaskId ?? null,
     childTaskIds: [],
@@ -155,7 +156,12 @@ export function assignTask<TState extends RuntimeStateLike, TTask extends TaskRe
     throw new Error(`Agent ${agent.id} is not assigned to project ${task.projectId}`);
   }
 
-  if (deps.requiresDesignHandoff(agent.role, task.lane)) {
+  const project = state.projects.find((item) => item.id === task.projectId);
+  if (!project) {
+    throw new Error(`Unknown project id: ${task.projectId}`);
+  }
+
+  if (project.lanes.includes("design") && deps.requiresDesignHandoff(agent.role, task.lane)) {
     const missing = validateDesignHandoffArtifacts(config, root, state, task.projectId);
     if (missing.length > 0) {
       throw new Error(`Design handoff incomplete for project ${task.projectId}. Missing: ${missing.join(", ")}`);
@@ -163,7 +169,7 @@ export function assignTask<TState extends RuntimeStateLike, TTask extends TaskRe
   }
 
   task.assigneeId = agent.id;
-  task.status = "assigned";
+  task.status = TASK_STATUS.assigned;
   task.updatedAt = new Date().toISOString();
   deps.appendEvent(state, {
     type: "task.assigned",
@@ -206,7 +212,7 @@ export function autoAssignTask<TState extends RuntimeStateLike, TTask extends Ta
 export function updateTaskStatus<TState extends RuntimeStateLike, TTask extends TaskRecordLike>(
   state: TState,
   input: { taskId: string; status: string },
-  deps: Pick<LifecycleDeps<TState, TTask, RuntimeAgentLike>, "appendEvent">
+  deps: Pick<LifecycleDeps<TState, TTask, RuntimeAgentLike>, "appendEvent" | "refreshTaskGraphState">
 ): TTask {
   const task = state.tasks.find((item) => item.id === input.taskId);
   if (!task) {
@@ -225,6 +231,7 @@ export function updateTaskStatus<TState extends RuntimeStateLike, TTask extends 
       lane: task.lane
     }
   });
+  deps.refreshTaskGraphState(state, task.id);
   return task as TTask;
 }
 
@@ -237,6 +244,9 @@ export function validateDesignHandoffArtifacts<TState extends RuntimeStateLike>(
   const project = state.projects.find((item) => item.id === projectId);
   if (!project) {
     throw new Error(`Unknown project id: ${projectId}`);
+  }
+  if (!project.lanes.includes("design")) {
+    return [];
   }
   if (!project.repoSlug) {
     return ["repo slug missing"];

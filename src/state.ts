@@ -42,6 +42,12 @@ import {
   workTurnMessage as composeWorkTurnMessage
 } from "./state/task-workflow-helpers.js";
 import {
+  defaultRoutingPolicy,
+  deriveTaskTitle,
+  inferLaneFromMessage,
+  inferProjectFromMessage
+} from "./state/routing-support.js";
+import {
   asMap,
   composeLinearIssuePayload,
   ensureConnectorEnabled,
@@ -151,6 +157,7 @@ export type ThreadDetail = {
   thread: ThreadRecord;
   messages: MessageRecord[];
   tasks: TaskRecord[];
+  handoffs: HandoffRecord[];
   consultations: ConsultationRecord[];
   reviews: ReviewRecord[];
   approvals: ApprovalRecord[];
@@ -188,6 +195,22 @@ export type ConsultationRecord = {
   response: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type HandoffRecord = {
+  id: string;
+  taskId: string;
+  threadId: string;
+  fromLane: string;
+  toLane: string;
+  fromAgentId: string | null;
+  toAgentId: string | null;
+  reason: string | null;
+  instructions: string | null;
+  status: "completed" | "pending_assignment";
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
 };
 
 export type ReviewRecord = {
@@ -291,6 +314,7 @@ export type ContinueThreadResult = {
     | "worked"
     | "review_requested"
     | "review_completed"
+    | "reported_closed"
     | "waiting"
     | "blocked"
     | "next_task_activated"
@@ -340,6 +364,7 @@ export type RuntimeState = {
   messages: MessageRecord[];
   events: EventRecord[];
   memories: MemoryRecord[];
+  handoffs: HandoffRecord[];
   consultations: ConsultationRecord[];
   reviews: ReviewRecord[];
   approvals: ApprovalRecord[];
@@ -351,6 +376,7 @@ export type RuntimeState = {
     message: number;
     event: number;
     memory: number;
+    handoff: number;
     consultation: number;
     review: number;
     approval: number;
@@ -380,6 +406,7 @@ const DEFAULT_STATE: RuntimeState = {
   messages: [],
   events: [],
   memories: [],
+  handoffs: [],
   consultations: [],
   reviews: [],
   approvals: [],
@@ -391,6 +418,7 @@ const DEFAULT_STATE: RuntimeState = {
     message: 0,
     event: 0,
     memory: 0,
+    handoff: 0,
     consultation: 0,
     review: 0,
     approval: 0,
@@ -699,6 +727,24 @@ export function listConsultations(
       return false;
     }
     if (filters?.status && consultation.status !== filters.status) {
+      return false;
+    }
+    return true;
+  }).slice().reverse();
+}
+
+export function listHandoffs(
+  state: RuntimeState,
+  filters?: { taskId?: string; threadId?: string; status?: string }
+): HandoffRecord[] {
+  return state.handoffs.filter((handoff) => {
+    if (filters?.taskId && handoff.taskId !== filters.taskId) {
+      return false;
+    }
+    if (filters?.threadId && handoff.threadId !== filters.threadId) {
+      return false;
+    }
+    if (filters?.status && handoff.status !== filters.status) {
       return false;
     }
     return true;
@@ -1185,7 +1231,8 @@ export function autoAssignTask(
 
 export function updateTaskStatus(state: RuntimeState, input: { taskId: string; status: string }): TaskRecord {
   return updateTaskStatusRecord(state, input, {
-    appendEvent
+    appendEvent,
+    refreshTaskGraphState
   });
 }
 
@@ -1193,8 +1240,8 @@ export function handoffTask(
   config: JSONObject,
   root: string,
   state: RuntimeState,
-  input: { taskId: string; lane: string }
-): { task: TaskRecord; threadId: string; message: MessageRecord; agentId: string | null; error: string | null } {
+  input: { taskId: string; lane: string; reason?: string; instructions?: string }
+): { handoff: HandoffRecord; task: TaskRecord; threadId: string; message: MessageRecord; agentId: string | null; error: string | null } {
   return handoffTaskRecord(config, root, state, input, {
     addMessage,
     addMemory,
@@ -1205,6 +1252,7 @@ export function handoffTask(
     findThreadByTask,
     nextApprovalId,
     nextConsultationId,
+    nextHandoffId,
     nextReviewId,
     refreshTaskGraphState
   });
@@ -1225,6 +1273,7 @@ export function requestConsultation(
     findThreadByTask,
     nextApprovalId,
     nextConsultationId,
+    nextHandoffId,
     nextReviewId,
     refreshTaskGraphState
   });
@@ -1245,6 +1294,7 @@ export function resolveConsultation(
     findThreadByTask,
     nextApprovalId,
     nextConsultationId,
+    nextHandoffId,
     nextReviewId,
     refreshTaskGraphState
   });
@@ -1265,6 +1315,7 @@ export function requestTaskReview(
     findThreadByTask,
     nextApprovalId,
     nextConsultationId,
+    nextHandoffId,
     nextReviewId,
     refreshTaskGraphState
   });
@@ -1285,6 +1336,7 @@ export function completeTaskReview(
     findThreadByTask,
     nextApprovalId,
     nextConsultationId,
+    nextHandoffId,
     nextReviewId,
     refreshTaskGraphState
   });
@@ -1305,6 +1357,7 @@ export function requestApproval(
     findThreadByTask,
     nextApprovalId,
     nextConsultationId,
+    nextHandoffId,
     nextReviewId,
     refreshTaskGraphState
   });
@@ -1325,6 +1378,7 @@ export function decideApproval(
     findThreadByTask,
     nextApprovalId,
     nextConsultationId,
+    nextHandoffId,
     nextReviewId,
     refreshTaskGraphState
   });
@@ -1505,6 +1559,11 @@ function nextMemoryId(state: RuntimeState): string {
   return `mem_${String(state.counters.memory).padStart(4, "0")}`;
 }
 
+function nextHandoffId(state: RuntimeState): string {
+  state.counters.handoff += 1;
+  return `handoff_${String(state.counters.handoff).padStart(4, "0")}`;
+}
+
 function nextConsultationId(state: RuntimeState): string {
   state.counters.consultation += 1;
   return `consult_${String(state.counters.consultation).padStart(4, "0")}`;
@@ -1532,6 +1591,7 @@ function normalizeCounters(state: Partial<RuntimeState>): RuntimeState["counters
     message: safeCounterValue(state.counters?.message, state.messages?.length ?? 0),
     event: safeCounterValue(state.counters?.event, state.events?.length ?? 0),
     memory: safeCounterValue(state.counters?.memory, state.memories?.length ?? 0),
+    handoff: safeCounterValue(state.counters?.handoff, state.handoffs?.length ?? 0),
     consultation: safeCounterValue(state.counters?.consultation, state.consultations?.length ?? 0),
     review: safeCounterValue(state.counters?.review, state.reviews?.length ?? 0),
     approval: safeCounterValue(state.counters?.approval, state.approvals?.length ?? 0),
@@ -1552,43 +1612,6 @@ function selectAgentForTask(state: RuntimeState, task: TaskRecord, routing: Rout
   return chooseAgentForTask(state, task, routing) as RuntimeAgent | null;
 }
 
-function inferProjectFromMessage(state: RuntimeState, body: string, routing: RoutingPolicy): string | null {
-  const lowered = body.toLowerCase();
-  for (const project of state.projects) {
-    const normalizedName = project.name.toLowerCase();
-    const normalizedId = project.id.toLowerCase();
-    if (lowered.includes(normalizedName) || lowered.includes(normalizedId)) {
-      return project.id;
-    }
-  }
-  return routing.defaultProject ?? state.projects[0]?.id ?? null;
-}
-
-function inferLaneFromMessage(body: string, routing: RoutingPolicy): string {
-  const lowered = body.toLowerCase();
-  for (const [lane, keywords] of Object.entries(routing.laneKeywords)) {
-    if (matchesAny(lowered, keywords)) {
-      return lane;
-    }
-  }
-  return routing.defaultLane;
-}
-
-function deriveTaskTitle(body: string): string {
-  const trimmed = body.trim().replace(/\s+/g, " ");
-  if (!trimmed) {
-    return "Untitled task";
-  }
-  if (trimmed.length <= 72) {
-    return trimmed;
-  }
-  return `${trimmed.slice(0, 69)}...`;
-}
-
-function matchesAny(value: string, candidates: string[]): boolean {
-  return candidates.some((candidate) => value.includes(candidate));
-}
-
 function nextStatusForWorkTurn(lane: string, status: string): string {
   return getNextStatusForWorkTurn(lane, status);
 }
@@ -1601,27 +1624,6 @@ function workTurnMessage(
   artifacts: { artifactPaths: string[]; summary: string }
 ): string {
   return composeWorkTurnMessage(agentName, role, task, nextStatus, artifacts);
-}
-
-function defaultRoutingPolicy(): RoutingPolicy {
-  return {
-    defaultProject: null,
-    defaultLane: "planning",
-    laneKeywords: {
-      research: ["research", "investigate", "analyze", "analysis"],
-      design: ["design", "redesign", "ux", "ui", "wireframe", "layout", "dashboard"],
-      planning: ["plan", "scope", "spec", "define"],
-      build: ["implement", "build", "code", "develop", "publish"],
-      review: ["review", "qa", "check"]
-    },
-    preferredRoles: {
-      planning: ["coordination", "design"],
-      research: ["coordination", "design"],
-      design: ["design", "coordination"],
-      build: ["build", "publishing"],
-      review: ["publishing", "build", "coordination"]
-    }
-  };
 }
 
 function appendEvent(state: RuntimeState, input: Omit<EventRecord, "id">): EventRecord {

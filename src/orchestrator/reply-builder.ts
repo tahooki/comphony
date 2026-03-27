@@ -62,12 +62,25 @@ export function composeContinueLoopReply(results: ContinueThreadResultLike[]): s
   return lines.join("\n");
 }
 
-export function composeProjectCreationReply(project: { name: string; id: string; lanes: string[]; repoSlug?: string | null }): string {
+export function composeProjectCreationReply(result: {
+  project: { name: string; id: string; lanes: string[]; repoSlug?: string | null };
+  provision: {
+    repoPath: string;
+    workspacePath: string;
+    workflowPaths: string[];
+    bootstrapPaths: string[];
+    reportMarkdownPath: string;
+  };
+  smokeTest: { taskId: string | null; threadId: string | null; assigneeId: string | null };
+}): string {
   return [
-    `Comphony opened a new project: ${project.name}.`,
-    `Project id: ${project.id}.`,
-    `Lanes: ${project.lanes.join(", ")}.`,
-    `Repo slug: ${project.repoSlug ?? "-"}.`
+    `Comphony opened project ${result.project.name} (${result.project.id}).`,
+    `Provisioned repo at ${result.provision.repoPath} and workspace at ${result.provision.workspacePath}.`,
+    `Generated workflows: ${result.provision.workflowPaths.join(", ")}.`,
+    `Bootstrap artifacts: ${result.provision.bootstrapPaths.join(", ")}.`,
+    `Provision report: ${result.provision.reportMarkdownPath}.`,
+    `Smoke test task: ${result.smokeTest.taskId ?? "-"}${result.smokeTest.threadId ? ` on thread ${result.smokeTest.threadId}` : ""}.`,
+    `Assigned agent: ${result.smokeTest.assigneeId ?? "-"}.`
   ].join(" ");
 }
 

@@ -9,6 +9,7 @@ runtime:
   repo_root: ./repos
   workspace_root: ./workspaces
   workflow_root: ./workflows
+  repo_bootstrap_strategy: clone
   local_server:
     host: 127.0.0.1
     port: 43110
@@ -37,7 +38,7 @@ policies:
   deploy_requires_approval: true
 
 routing:
-  default_project: product_core
+  default_project: comphony_desk
   default_lane: planning
   lane_keywords:
     research:
@@ -45,6 +46,10 @@ routing:
       - investigate
       - analyze
       - analysis
+      - 리서치
+      - 조사
+      - 탐색
+      - 분석
     design:
       - design
       - redesign
@@ -53,21 +58,46 @@ routing:
       - wireframe
       - layout
       - dashboard
+      - 디자인
+      - 설계
+      - 화면
+      - 레이아웃
+      - 대시보드
     planning:
       - plan
       - scope
       - spec
       - define
+      - 기획
+      - 계획
+      - 범위
+      - 정의
+      - 명세
+      - 로드맵
     build:
       - implement
       - build
       - code
       - develop
       - publish
+      - fix
+      - patch
+      - hotfix
+      - 구현
+      - 개발
+      - 코드
+      - 제작
+      - 배포
+      - 수정
+      - 패치
     review:
       - review
       - qa
       - check
+      - 리뷰
+      - 검토
+      - 확인
+      - 테스트
   preferred_roles:
     planning:
       - coordination
@@ -87,6 +117,50 @@ routing:
       - coordination
 
 projects:
+  - id: comphony_desk
+    name: Comphony Desk
+    purpose: Front door intake, triage, and downstream coordination
+    lanes:
+      - planning
+      - research
+      - review
+    tracker_sync:
+      provider: linear
+      mode: mirror_out
+      project_name: Comphony Desk
+
+  - id: idea_lab
+    name: Idea Lab
+    purpose: Shape ideas, plans, and exploratory research
+    repo:
+      mode: canonical
+      slug: idea-lab
+      default_branch: main
+    lanes:
+      - planning
+      - research
+      - review
+    tracker_sync:
+      provider: linear
+      mode: mirror_out
+      project_name: Idea Lab
+
+  - id: project_managing
+    name: Project Managing
+    purpose: Provision repos, workflows, and operating lanes
+    repo:
+      mode: canonical
+      slug: project-admin
+      default_branch: main
+    lanes:
+      - planning
+      - build
+      - review
+    tracker_sync:
+      provider: linear
+      mode: mirror_out
+      project_name: Project Managing
+
   - id: product_core
     name: Product - Core
     purpose: Main product execution
@@ -105,7 +179,41 @@ projects:
       mode: mirror_out
       project_name: Product - Core
 
+  - id: ops_maintenance
+    name: Ops / Maintenance
+    purpose: Handle maintenance, operational fixes, and follow-up tasks
+    repo:
+      mode: canonical
+      slug: ops-maintenance
+      default_branch: main
+    lanes:
+      - planning
+      - build
+      - review
+    tracker_sync:
+      provider: linear
+      mode: mirror_out
+      project_name: Ops / Maintenance
+
 agents:
+  - id: project_admin_01
+    name: Project Admin
+    role: project_admin
+    source:
+      kind: local_package
+      ref: ./agents/project_admin_01
+    capabilities:
+      - provisioning
+      - workflow_generation
+      - repo_bootstrap
+    permissions:
+      read_repo: allow
+      write_repo: guarded
+      run_commands: guarded
+      request_review: allow
+    assigned_projects:
+      - project_managing
+
   - id: desk_coordinator
     name: Comphony Desk Coordinator
     role: coordination
@@ -121,7 +229,11 @@ agents:
       write_memory: allow
       request_review: allow
     assigned_projects:
+      - comphony_desk
+      - idea_lab
+      - project_managing
       - product_core
+      - ops_maintenance
 
   - id: product_dev_01
     name: Product Core Developer
@@ -139,6 +251,7 @@ agents:
       run_commands: guarded
     assigned_projects:
       - product_core
+      - ops_maintenance
 
   - id: design_planner_01
     name: Product Design Planner
@@ -173,6 +286,7 @@ agents:
       run_commands: guarded
     assigned_projects:
       - product_core
+      - ops_maintenance
 
 connectors:
   telegram:

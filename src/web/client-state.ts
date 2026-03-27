@@ -1,3 +1,5 @@
+import { TASK_STATUS } from "../state/task-policy.js";
+
 export const WEB_APP_CLIENT_STATE_SCRIPT = String.raw`
       const state = {
         actorId: "owner_01",
@@ -49,11 +51,11 @@ export const WEB_APP_CLIENT_STATE_SCRIPT = String.raw`
       }
 
       function taskComplete(task) {
-        return ["reported", "done"].includes(task.status);
+        return ${JSON.stringify([TASK_STATUS.reported, TASK_STATUS.done])}.includes(task.status);
       }
 
       function taskBlocked(task) {
-        return ["blocked", "waiting", "consulting"].includes(task.status) || task.needsApproval;
+        return ${JSON.stringify([TASK_STATUS.blocked, TASK_STATUS.waiting, TASK_STATUS.consulting])}.includes(task.status) || task.needsApproval;
       }
 
       function getCurrentThreadTask(detail) {

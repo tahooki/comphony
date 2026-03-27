@@ -1,3 +1,5 @@
+import { TASK_STATUS } from "./task-policy.js";
+
 type MemoryRecordLike = {
   id: string;
   scope: "company" | "project" | "thread" | "task" | "agent";
@@ -256,7 +258,7 @@ function scoreTask(
     score += overlaps.length * 2;
   }
 
-  if (task.status === "done" || task.status === "review") {
+  if (task.status === TASK_STATUS.done || task.status === TASK_STATUS.review) {
     score += 1;
   }
 

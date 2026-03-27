@@ -57,6 +57,9 @@ export function validateCompanyConfig(config: JSONObject, root: string): Validat
     requireString(runtime, "repo_root", "runtime", errors);
     requireString(runtime, "workspace_root", "runtime", errors);
     requireString(runtime, "workflow_root", "runtime", errors);
+    if (runtime.repo_bootstrap_strategy !== undefined && !["clone", "worktree"].includes(runtime.repo_bootstrap_strategy as string)) {
+      errors.push("runtime.repo_bootstrap_strategy must be clone or worktree when provided.");
+    }
 
     const localServer = expectMap(runtime, "local_server", errors, "runtime");
     if (localServer) {

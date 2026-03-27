@@ -28,6 +28,10 @@ type ConsultationRecordLike = {
   taskId: string;
 };
 
+type HandoffRecordLike = {
+  taskId: string;
+};
+
 type ReviewRecordLike = {
   taskId: string;
 };
@@ -44,6 +48,7 @@ type RuntimeStateLike = {
   threads: ThreadRecordLike[];
   messages: MessageRecordLike[];
   tasks: TaskRecordLike[];
+  handoffs: HandoffRecordLike[];
   consultations: ConsultationRecordLike[];
   reviews: ReviewRecordLike[];
   approvals: ApprovalRecordLike[];
@@ -73,11 +78,13 @@ export function listThreads<TState extends RuntimeStateLike>(state: TState): TSt
 
 export function getThreadDetail<
   TTask extends TaskRecordLike,
+  THandoff extends HandoffRecordLike,
   TConsultation extends ConsultationRecordLike,
   TReview extends ReviewRecordLike,
   TApproval extends ApprovalRecordLike,
   TState extends RuntimeStateLike & {
     tasks: TTask[];
+    handoffs: THandoff[];
     consultations: TConsultation[];
     reviews: TReview[];
     approvals: TApproval[];
@@ -89,6 +96,7 @@ export function getThreadDetail<
   thread: ThreadRecordLike;
   messages: MessageRecordLike[];
   tasks: TTask[];
+  handoffs: THandoff[];
   consultations: TConsultation[];
   reviews: TReview[];
   approvals: TApproval[];
@@ -103,6 +111,7 @@ export function getThreadDetail<
     thread,
     messages: state.messages.filter((message) => message.threadId === threadId),
     tasks: state.tasks.filter((task) => taskIds.has(task.id)) as TTask[],
+    handoffs: state.handoffs.filter((handoff) => taskIds.has(handoff.taskId)) as THandoff[],
     consultations: state.consultations.filter((consultation) => taskIds.has(consultation.taskId)) as TConsultation[],
     reviews: state.reviews.filter((review) => taskIds.has(review.taskId)) as TReview[],
     approvals: state.approvals.filter((approval) => Boolean(approval.taskId && taskIds.has(approval.taskId))) as TApproval[]

@@ -1,6 +1,19 @@
 import type { JSONObject } from "../config.js";
 import { resolveRoutingPolicy } from "../config.js";
-import { autoReviewTarget, isTaskAwaitingConsultation, isTaskComplete, isTaskReviewRequested, isTaskWaitingForApproval } from "../state/task-policy.js";
+import {
+  createProjectSmokeTestRequest,
+  createProvisionedProjectFlow,
+  type ProvisionProjectResult
+} from "../provisioning.js";
+import {
+  TASK_STATUS,
+  autoReviewTarget,
+  isTaskAwaitingConsultation,
+  isTaskComplete,
+  isTaskReviewRequested,
+  isTaskWaitingForApproval,
+  shouldAutoRequestReview
+} from "../state/task-policy.js";
 import { resolveConversationAction, type ConversationAction } from "./conversation-intents.js";
 import {
   composeAgentDirectedReply,
@@ -73,7 +86,7 @@ type ThreadDetailLike = {
 type ContinueThreadResultLike = {
   threadId: string;
   taskId: string | null;
-  action: "assigned" | "worked" | "review_requested" | "review_completed" | "waiting" | "blocked" | "next_task_activated" | "nothing_to_do";
+  action: "assigned" | "worked" | "review_requested" | "review_completed" | "reported_closed" | "waiting" | "blocked" | "next_task_activated" | "nothing_to_do";
   message: MessageLike | null;
   task: TaskLike | null;
   notes: string[];
@@ -90,6 +103,7 @@ type IntakeResultLike = {
 };
 
 type RuntimeStateLike = {
+  projects: ProjectLike[];
   agents: AgentLike[];
   tasks: TaskLike[];
   threads: ThreadLike[];
@@ -181,6 +195,12 @@ type OrchestratorDeps<TState extends RuntimeStateLike, TTask extends TaskLike, T
   selectAgentForTask: (state: TState, task: TTask, routing: ReturnType<typeof resolveRoutingPolicy>) => AgentLike | null;
 };
 
+type ProjectProvisioningSmokeTestLike = {
+  taskId: string | null;
+  threadId: string | null;
+  assigneeId: string | null;
+};
+
 export function respondToThread<TState extends RuntimeStateLike, TTask extends TaskLike, TThread extends ThreadLike, TMessage extends MessageLike>(
   config: JSONObject,
   root: string,
@@ -199,9 +219,10 @@ export function respondToThread<TState extends RuntimeStateLike, TTask extends T
     body: input.body
   }, routing);
   const detail = deps.getThreadDetail(state, thread.id);
+  const replyContextTask = detail.tasks.find((task) => task.parentTaskId !== null) ?? detail.tasks[0] ?? null;
   deps.addMemory(state, {
     scope: "thread",
-    projectId: detail.tasks[0]?.projectId ?? null,
+    projectId: replyContextTask?.projectId ?? null,
     threadId: thread.id,
     kind: "follow_up",
     body: `User follow-up: ${input.body}`,
@@ -209,7 +230,7 @@ export function respondToThread<TState extends RuntimeStateLike, TTask extends T
   });
   const targetedAgent = userMessage.targetAgentId ? state.agents.find((agent) => agent.id === userMessage.targetAgentId) ?? null : null;
   const directAction = !targetedAgent
-    ? resolveConversationAction(input.body, { threadId: detail.thread.id, currentProjectId: detail.tasks[0]?.projectId })
+    ? resolveConversationAction(input.body, { threadId: detail.thread.id, currentProjectId: replyContextTask?.projectId })
     : null;
 
   const responseBody = targetedAgent
@@ -217,7 +238,7 @@ export function respondToThread<TState extends RuntimeStateLike, TTask extends T
     : directAction?.kind === "continue_loop"
       ? composeContinueLoopReply(continueThreadUntilPause(config, root, state, { threadId: thread.id }, deps))
       : directAction?.kind === "create_project"
-        ? composeProjectCreationReply(deps.createProject(state, directAction.project))
+        ? composeProjectCreationReply(createProjectFromConversation(config, root, state, directAction.project, deps))
         : directAction?.kind === "install_agent"
           ? composeAgentInstallReply(installAndMaybeAssignAgent(state, root, {
               sourceKind: directAction.sourceKind,
@@ -231,16 +252,16 @@ export function respondToThread<TState extends RuntimeStateLike, TTask extends T
                 detail,
                 input.body,
                 deps.recommendMemories(state, {
-                  projectId: detail.tasks[0]?.projectId ?? undefined,
+                  projectId: replyContextTask?.projectId ?? undefined,
                   threadId: thread.id,
-                  taskId: detail.tasks[0]?.id ?? undefined,
+                  taskId: replyContextTask?.id ?? undefined,
                   query: input.body,
                   limit: 3
                 }),
                 deps.recommendTasks(state, {
-                  projectId: detail.tasks[0]?.projectId ?? undefined,
+                  projectId: replyContextTask?.projectId ?? undefined,
                   threadId: thread.id,
-                  taskId: detail.tasks[0]?.id ?? undefined,
+                  taskId: replyContextTask?.id ?? undefined,
                   query: input.body,
                   limit: 3
                 })
@@ -250,8 +271,8 @@ export function respondToThread<TState extends RuntimeStateLike, TTask extends T
     threadId: thread.id,
     role: targetedAgent ? "agent" : "system",
     body: responseBody,
-    routedProjectId: detail.tasks[0]?.projectId ?? userMessage.routedProjectId,
-    suggestedLane: detail.tasks[0]?.lane ?? userMessage.suggestedLane,
+    routedProjectId: replyContextTask?.projectId ?? userMessage.routedProjectId,
+    suggestedLane: replyContextTask?.lane ?? userMessage.suggestedLane,
     targetAgentId: targetedAgent?.id ?? null
   }, routing);
   deps.appendEvent(state, {
@@ -287,14 +308,15 @@ export function intakeRequest<TState extends RuntimeStateLike, TTask extends Tas
   if (!projectId) {
     throw new Error("Could not determine project for intake request");
   }
+  const rootProjectId = shouldCreateDeskParentForRoutedDownstreamProject(projectId, input.projectId) ? "comphony_desk" : projectId;
   const requestedLanes = deps.deriveRequestedLanes(state, projectId, input.body, input.lane ?? message.suggestedLane ?? undefined, routing);
   const rootTask = deps.createTask(state, {
-    projectId,
+    projectId: rootProjectId,
     title: input.title,
     description: input.body,
     lane: "planning"
   });
-  rootTask.status = "in_progress";
+  rootTask.status = TASK_STATUS.inProgress;
   rootTask.completionSummary = "Comphony accepted the request and is coordinating child tasks.";
   if (!thread.taskIds.includes(rootTask.id)) {
     thread.taskIds.push(rootTask.id);
@@ -316,6 +338,9 @@ export function intakeRequest<TState extends RuntimeStateLike, TTask extends Tas
     if (!thread.taskIds.includes(plannedTask.id)) {
       thread.taskIds.push(plannedTask.id);
     }
+  }
+  if (task.status === TASK_STATUS.new) {
+    task.status = TASK_STATUS.triaged;
   }
   deps.addMemory(state, {
     scope: "thread",
@@ -415,6 +440,27 @@ export function continueThread<TState extends RuntimeStateLike, TTask extends Ta
     readyTasks.find((task) => !isTaskComplete(task) && task.parentTaskId !== null) ??
     readyTasks.find((task) => !isTaskComplete(task));
   if (!activeTask) {
+    const reportReadyParent = readyTasks.find((task) => task.parentTaskId === null && task.status === TASK_STATUS.reported) ?? null;
+    if (reportReadyParent) {
+      const now = new Date().toISOString();
+      reportReadyParent.status = TASK_STATUS.done;
+      reportReadyParent.updatedAt = now;
+      const message = deps.addMessage(state, {
+        threadId: thread.id,
+        role: "system",
+        body: composeReportedClosureMessage(reportReadyParent),
+        routedProjectId: reportReadyParent.projectId,
+        suggestedLane: reportReadyParent.lane
+      }, resolveRoutingPolicy(config));
+      return {
+        threadId: thread.id,
+        taskId: reportReadyParent.id,
+        action: "reported_closed",
+        message,
+        task: reportReadyParent,
+        notes: ["reported parent finalized"]
+      };
+    }
     const message = deps.addMessage(state, {
       threadId: thread.id,
       role: "system",
@@ -533,7 +579,7 @@ export function continueThread<TState extends RuntimeStateLike, TTask extends Ta
 
   const work = deps.runTaskWorkTurn(config, root, state, { taskId: activeTask.id });
   const reviewTarget = autoReviewTarget(state, work.task);
-  if (work.task.status === "review" && work.task.lane !== "review" && reviewTarget) {
+  if (shouldAutoRequestReview(work.task) && reviewTarget) {
     deps.requestTaskReview(config, state, {
       taskId: work.task.id,
       reviewerAgentId: reviewTarget.id,
@@ -603,4 +649,79 @@ function installAndMaybeAssignAgent<TState extends RuntimeStateLike, TTask exten
     return { agent, assignedProjectId: input.projectId };
   }
   return { agent, assignedProjectId: null };
+}
+
+function createProjectFromConversation<TState extends RuntimeStateLike, TTask extends TaskLike, TThread extends ThreadLike, TMessage extends MessageLike>(
+  config: JSONObject,
+  root: string,
+  state: TState,
+  project: { id: string; name: string; purpose?: string; lanes: string[]; repoSlug?: string | null },
+  deps: OrchestratorDeps<TState, TTask, TThread, TMessage>
+): { project: ProjectLike; provision: ProvisionProjectResult; smokeTest: ProjectProvisioningSmokeTestLike } {
+  return createProvisionedProjectFlow(config, root, {
+    projectId: project.id,
+    name: project.name,
+    purpose: project.purpose,
+    lanes: project.lanes,
+    repoSlug: project.repoSlug ?? undefined
+  }, {
+    findProjectById: (projectId) => state.projects.find((candidate) => candidate.id === projectId) ?? null,
+    createProject: (input) => deps.createProject(state, {
+      ...input,
+      purpose: input.purpose ?? undefined
+    }),
+    createSmokeTest: (createdProject) => createConversationSmokeTest(config, root, state, createdProject, deps)
+  });
+}
+
+function createConversationSmokeTest<TState extends RuntimeStateLike, TTask extends TaskLike, TThread extends ThreadLike, TMessage extends MessageLike>(
+  config: JSONObject,
+  root: string,
+  state: TState,
+  project: ProjectLike,
+  deps: OrchestratorDeps<TState, TTask, TThread, TMessage>
+): ProjectProvisioningSmokeTestLike {
+  const smokeTest = createProjectSmokeTestRequest(project.name);
+  if (project.lanes.includes("planning")) {
+    const intake = intakeRequest(config, root, state, {
+      title: smokeTest.title,
+      body: smokeTest.description,
+      projectId: project.id,
+      lane: "planning"
+    }, deps);
+    return {
+      taskId: intake.task.id,
+      threadId: intake.thread.id,
+      assigneeId: intake.assignedAgentId
+    };
+  }
+
+  const lane = project.lanes[0] ?? "build";
+  const task = deps.createTask(state, {
+    projectId: project.id,
+    title: smokeTest.title,
+    description: smokeTest.description,
+    lane
+  });
+  const assignment = deps.autoAssignTask(config, root, state, task.id);
+  return {
+    taskId: task.id,
+    threadId: null,
+    assigneeId: assignment.agentId
+  };
+}
+
+function shouldCreateDeskParentForRoutedDownstreamProject(projectId: string, explicitProjectId?: string): boolean {
+  if (explicitProjectId) {
+    return false;
+  }
+  return projectId !== "comphony_desk";
+}
+
+function composeReportedClosureMessage(task: TaskLike): string {
+  const summary = task.completionSummary ?? "All linked child tasks reported back.";
+  if (task.projectId === "comphony_desk") {
+    return `Desk final report for ${task.title}: ${summary}`;
+  }
+  return `Comphony finalized ${task.title}. ${summary}`;
 }

@@ -210,8 +210,8 @@ Status:
 
 - [ ] `continueThread` / `runTaskWorkTurn`의 lane-specific rule 잔여 로직 재점검
 - [ ] scattered status string 정리
-- [ ] direct agent mention / manager reply 호환성 확인
-- [ ] `/v1/*` endpoint surface unchanged 명시적 확인
+- [x] direct agent mention / manager reply 호환성 확인
+- [x] `/v1/*` endpoint surface unchanged 명시적 확인
 - [ ] `state.ts`를 thin compatibility layer 수준으로 마무리
 
 ## 검증 규칙

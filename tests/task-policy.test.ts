@@ -17,8 +17,10 @@ import {
 
 test("task policy defines expected work-turn transitions", () => {
   assert.equal(nextStatusForWorkTurn("build", TASK_STATUS.new), TASK_STATUS.inProgress);
+  assert.equal(nextStatusForWorkTurn("build", TASK_STATUS.triaged), TASK_STATUS.inProgress);
   assert.equal(nextStatusForWorkTurn("build", TASK_STATUS.assigned), TASK_STATUS.inProgress);
   assert.equal(nextStatusForWorkTurn("build", TASK_STATUS.inProgress), TASK_STATUS.review);
+  assert.equal(nextStatusForWorkTurn("review", TASK_STATUS.triaged), TASK_STATUS.review);
   assert.equal(nextStatusForWorkTurn("review", TASK_STATUS.assigned), TASK_STATUS.review);
   assert.equal(nextStatusForWorkTurn("review", TASK_STATUS.inProgress), TASK_STATUS.done);
   assert.equal(nextStatusForWorkTurn("review", TASK_STATUS.done), TASK_STATUS.done);
@@ -149,4 +151,91 @@ test("task policy refreshes parent-child graph status consistently", () => {
 
   assert.equal(parent.status, TASK_STATUS.done);
   assert.equal(parent.completionSummary, "Completed child lanes: design, build.");
+});
+
+test("task policy marks Desk parent as reported when downstream children report back", () => {
+  const parent = {
+    id: "desk_parent",
+    projectId: "comphony_desk",
+    lane: "planning",
+    status: TASK_STATUS.inProgress,
+    assigneeId: null,
+    parentTaskId: null,
+    childTaskIds: ["pm_child"],
+    blockingReason: null,
+    needsApproval: false,
+    completionSummary: null,
+    artifactPaths: [],
+    updatedAt: "2026-03-26T00:00:00.000Z"
+  };
+
+  const child = {
+    id: "pm_child",
+    projectId: "project_managing",
+    lane: "planning",
+    status: TASK_STATUS.reported,
+    assigneeId: null,
+    parentTaskId: "desk_parent",
+    childTaskIds: [],
+    blockingReason: null,
+    needsApproval: false,
+    completionSummary: "Provision report captured the repo, workflow, and bootstrap paths.",
+    artifactPaths: ["/tmp/provision-report.md"],
+    updatedAt: "2026-03-26T00:00:00.000Z"
+  };
+
+  const state = {
+    agents: [],
+    tasks: [parent, child]
+  };
+
+  refreshTaskGraphState(state, "pm_child");
+
+  assert.equal(parent.status, TASK_STATUS.reported);
+  assert.match(parent.completionSummary ?? "", /Project Managing reported back to Comphony Desk/);
+  assert.match(parent.completionSummary ?? "", /Artifacts: \/tmp\/provision-report.md\./);
+});
+
+test("task policy treats completed downstream Desk children as a report boundary", () => {
+  const parent = {
+    id: "desk_parent",
+    projectId: "comphony_desk",
+    lane: "planning",
+    status: TASK_STATUS.inProgress,
+    assigneeId: null,
+    parentTaskId: null,
+    childTaskIds: ["product_child"],
+    blockingReason: null,
+    needsApproval: false,
+    completionSummary: null,
+    artifactPaths: [],
+    updatedAt: "2026-03-26T00:00:00.000Z"
+  };
+
+  const child = {
+    id: "product_child",
+    projectId: "product_core",
+    lane: "planning",
+    status: TASK_STATUS.done,
+    assigneeId: null,
+    parentTaskId: "desk_parent",
+    childTaskIds: [],
+    blockingReason: null,
+    needsApproval: false,
+    completionSummary: "Plan complete.",
+    artifactPaths: ["/tmp/product-plan.md"],
+    updatedAt: "2026-03-26T00:00:00.000Z"
+  };
+
+  const state = {
+    agents: [],
+    tasks: [parent, child]
+  };
+
+  refreshTaskGraphState(state, "product_child");
+
+  assert.equal(parent.status, TASK_STATUS.reported);
+  assert.match(parent.completionSummary ?? "", /Product Core reported back to Comphony Desk/);
+  assert.match(parent.completionSummary ?? "", /Plan complete\./);
+  assert.match(parent.completionSummary ?? "", /Artifacts: \/tmp\/product-plan.md\./);
 });

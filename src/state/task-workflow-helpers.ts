@@ -1,5 +1,6 @@
 import type { RoutingPolicy } from "../config.js";
 import {
+  TASK_STATUS,
   isTaskBlocked,
   isTaskComplete,
   refreshTaskGraphState
@@ -158,10 +159,10 @@ export function workTurnMessage<TTask extends Pick<TaskRecordLike, "title" | "la
   nextStatus: string,
   artifacts: { artifactPaths: string[]; summary: string }
 ): string {
-  if (nextStatus === "in_progress") {
+  if (nextStatus === TASK_STATUS.inProgress) {
     return `${agentName} picked up ${task.title} as the ${role} agent and is now working on the ${task.lane} lane. ${artifacts.summary} Artifacts: ${artifacts.artifactPaths.join(", ")}`;
   }
-  if (nextStatus === "review") {
+  if (nextStatus === TASK_STATUS.review) {
     return `${agentName} completed the current work turn for ${task.title} and moved it to review. ${artifacts.summary} Artifacts: ${artifacts.artifactPaths.join(", ")}`;
   }
   return `${agentName} checked ${task.title} and kept it in ${nextStatus}. ${artifacts.summary}`;

@@ -71,6 +71,7 @@ type RuntimeStateLike = {
     message: number;
     event: number;
     memory: number;
+    handoff: number;
     consultation: number;
     review: number;
     approval: number;
@@ -82,6 +83,7 @@ type RuntimeStateLike = {
   messages?: MessageRecordLike[];
   events?: unknown[];
   memories?: Array<{ tags: unknown[] }>;
+  handoffs?: Array<{ toAgentId: unknown; reason: unknown; instructions: unknown; completedAt: unknown }>;
   consultations?: Array<{ response: unknown }>;
   reviews?: Array<{ notes: unknown; outcome: unknown }>;
   approvals?: Array<{ taskId: unknown; threadId: unknown; notes: unknown; resumeStatus: unknown }>;
@@ -110,6 +112,7 @@ export function syncCatalogFromConfig(config: JSONObject, state: RuntimeStateLik
       threads: normalizedThreads,
       events: state.events ?? [],
       memories: state.memories ?? [],
+      handoffs: state.handoffs ?? [],
       consultations: state.consultations ?? [],
       reviews: state.reviews ?? [],
       approvals: state.approvals ?? [],
@@ -149,6 +152,13 @@ export function syncCatalogFromConfig(config: JSONObject, state: RuntimeStateLik
       tags: Array.isArray(memory.tags)
         ? memory.tags.filter((item: unknown): item is string => typeof item === "string")
         : []
+    })),
+    handoffs: (state.handoffs ?? []).map((handoff) => ({
+      ...handoff,
+      toAgentId: typeof handoff.toAgentId === "string" ? handoff.toAgentId : null,
+      reason: typeof handoff.reason === "string" ? handoff.reason : null,
+      instructions: typeof handoff.instructions === "string" ? handoff.instructions : null,
+      completedAt: typeof handoff.completedAt === "string" ? handoff.completedAt : null
     })),
     consultations: (state.consultations ?? []).map((consultation) => ({
       ...consultation,
@@ -398,6 +408,7 @@ function normalizeCounters(state: RuntimeStateLike): NonNullable<RuntimeStateLik
     message: safeCounterValue(state.counters?.message, state.messages?.length ?? 0),
     event: safeCounterValue(state.counters?.event, state.events?.length ?? 0),
     memory: safeCounterValue(state.counters?.memory, state.memories?.length ?? 0),
+    handoff: safeCounterValue(state.counters?.handoff, state.handoffs?.length ?? 0),
     consultation: safeCounterValue(state.counters?.consultation, state.consultations?.length ?? 0),
     review: safeCounterValue(state.counters?.review, state.reviews?.length ?? 0),
     approval: safeCounterValue(state.counters?.approval, state.approvals?.length ?? 0),

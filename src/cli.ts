@@ -1,7 +1,13 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { ConfigError, loadCompanyConfig, resolveRoutingPolicy, validateCompanyConfig } from "./config.js";
+import {
+  createProjectSmokeTestRequest,
+  createProvisionedProjectFlow,
+  generateProjectWorkflows,
+  provisionProjectFoundation
+} from "./provisioning.js";
 import { startServer } from "./server.js";
 import type { Command } from "./cli/command-registry.js";
 import { parseArgs } from "./cli/parser.js";
@@ -67,6 +73,8 @@ export function main(argv = process.argv.slice(2)): number {
         return runInit(root, configPath, parsed.command.force);
       case "validate":
         return runValidate(root, configPath);
+      case "smoke-test":
+        return runSmokeTest(root, configPath, parsed.command);
       case "server-start":
         return runServer(root, configPath);
       case "project-list":
@@ -75,6 +83,10 @@ export function main(argv = process.argv.slice(2)): number {
         return runProjectOverview(root, configPath);
       case "project-create":
         return runProjectCreate(root, configPath, parsed.command);
+      case "project-provision":
+        return runProjectProvision(root, configPath, parsed.command);
+      case "workflow-generate":
+        return runWorkflowGenerate(root, configPath, parsed.command);
       case "agent-list":
         return runAgentList(root, configPath, parsed.command.projectId);
       case "agent-catalog":
@@ -238,6 +250,43 @@ function runValidate(root: string, configPath: string): number {
   return 0;
 }
 
+function runSmokeTest(
+  root: string,
+  configPath: string,
+  command: Extract<Command, { kind: "smoke-test" }>
+): number {
+  const config = loadOrExit(configPath);
+  const state = loadRuntimeState(config, root);
+  const project = command.projectId
+    ? listProjects(state).find((item) => item.id === command.projectId)
+    : listProjects(state).find((item) => item.id !== "project_managing") ?? listProjects(state)[0];
+  if (!project) {
+    throw new Error("No project available for smoke-test");
+  }
+
+  const repoRoot = resolve(root, configString(config.runtime, "repo_root", "./repos"));
+  const workflowRoot = resolve(root, configString(config.runtime, "workflow_root", "./workflows"));
+  const repoPath = resolve(repoRoot, project.repoSlug ?? project.id);
+  if (!existsSync(repoPath)) {
+    throw new Error(`Smoke-test failed: repo path missing for ${project.id}: ${repoPath}`);
+  }
+  if (!existsSync(workflowRoot)) {
+    throw new Error(`Smoke-test failed: workflow root missing: ${workflowRoot}`);
+  }
+  const smokeTest = createSmokeTestRequest(config, root, state, project.id, project.name, project.lanes);
+  saveRuntimeState(config, root, state);
+  console.log(
+    [
+      `project=${project.id}`,
+      `repo=${repoPath}`,
+      `workflow_root=${workflowRoot}`,
+      `smoke_task=${smokeTest.taskId ?? "-"}`,
+      `smoke_thread=${smokeTest.threadId ?? "-"}`
+    ].join("\t")
+  );
+  return 0;
+}
+
 function runServer(root: string, configPath: string): number {
   let config;
   try {
@@ -286,15 +335,89 @@ function runProjectCreate(
 ): number {
   const config = loadOrExit(configPath);
   const state = loadRuntimeState(config, root);
-  const project = createProject(state, {
-    id: command.projectId,
+  const result = createProvisionedProjectFlow(config, root, {
+    projectId: command.projectId,
     name: command.name,
     purpose: command.purpose,
     lanes: command.lanes,
     repoSlug: command.repoSlug
+  }, {
+    findProjectById: (projectId) => listProjects(state).find((project) => project.id === projectId) ?? null,
+    createProject: (input) => createProject(state, {
+      ...input,
+      purpose: input.purpose ?? undefined
+    }),
+    createSmokeTest: (project) => createSmokeTestRequest(config, root, state, project.id, project.name, project.lanes)
   });
   saveRuntimeState(config, root, state);
-  console.log(`${project.id}\t${project.name}\t${project.repoSlug ?? "-"}\t${project.source}`);
+  console.log(
+    [
+      `project=${result.project.id}`,
+      `repo=${result.provision.repoPath}`,
+      `workflows=${result.provision.workflowPaths.join(",")}`,
+      `smoke_task=${result.smokeTest.taskId ?? "-"}`,
+      `smoke_thread=${result.smokeTest.threadId ?? "-"}`
+    ].join("\t")
+  );
+  return 0;
+}
+
+function runProjectProvision(
+  root: string,
+  configPath: string,
+  command: Extract<Command, { kind: "project-provision" }>
+): number {
+  const config = loadOrExit(configPath);
+  const state = loadRuntimeState(config, root);
+  const result = createProvisionedProjectFlow(config, root, {
+    projectId: command.projectId,
+    name: command.name,
+    purpose: command.purpose,
+    lanes: command.lanes,
+    repoSlug: command.repoSlug,
+    repoPath: command.repoPath,
+    defaultBranch: command.defaultBranch,
+    bootstrapStrategy: command.bootstrapStrategy
+  }, {
+    findProjectById: (projectId) => listProjects(state).find((project) => project.id === projectId) ?? null,
+    createProject: (input) => createProject(state, {
+      ...input,
+      purpose: input.purpose ?? undefined
+    }),
+    createSmokeTest: (project) => createSmokeTestRequest(config, root, state, project.id, project.name, project.lanes)
+  });
+  saveRuntimeState(config, root, state);
+  console.log(
+    [
+      `project=${result.project.id}`,
+      `repo=${result.provision.repoPath}`,
+      `workspace=${result.provision.workspacePath}`,
+      `workflows=${result.provision.workflowPaths.join(",")}`,
+      `bootstrap=${result.provision.bootstrapPaths.join(",")}`,
+      `report=${result.provision.reportJsonPath}`,
+      `smoke_task=${result.smokeTest.taskId ?? "-"}`,
+      `smoke_thread=${result.smokeTest.threadId ?? "-"}`
+    ].join("\t")
+  );
+  return 0;
+}
+
+function runWorkflowGenerate(
+  root: string,
+  configPath: string,
+  command: Extract<Command, { kind: "workflow-generate" }>
+): number {
+  const config = loadOrExit(configPath);
+  const state = loadRuntimeState(config, root);
+  const project = listProjects(state).find((item) => item.id === command.projectId);
+  if (!project) {
+    throw new Error(`Unknown project id: ${command.projectId}`);
+  }
+  const result = generateProjectWorkflows(config, root, project, {
+    defaultBranch: command.defaultBranch,
+    bootstrapStrategy: command.bootstrapStrategy
+  });
+  console.log(result.workflowPaths.join("\n"));
   return 0;
 }
 
@@ -975,10 +1098,13 @@ function helpText(): string {
     "Usage:",
     "  comphony [--config company.yaml] init [--force]",
     "  comphony [--config company.yaml] validate",
+    "  comphony [--config company.yaml] smoke-test [--project <project-id>]",
     "  comphony [--config company.yaml] server start",
     "  comphony [--config company.yaml] project list",
     "  comphony [--config company.yaml] project overview",
     "  comphony [--config company.yaml] project create --id <project-id> --name <name> --lanes <comma-separated> [--purpose <text>] [--repo-slug <slug>]",
+    "  comphony [--config company.yaml] project provision --id <project-id> --name <name> --lanes <comma-separated> [--purpose <text>] [--repo-slug <slug>] [--repo-path <path>] [--default-branch <branch>] [--bootstrap-strategy clone|worktree]",
+    "  comphony [--config company.yaml] workflow generate --project <project-id> [--default-branch <branch>] [--bootstrap-strategy clone|worktree]",
     "  comphony [--config company.yaml] agent list [--project <project-id>]",
     "  comphony [--config company.yaml] agent catalog",
     "  comphony [--config company.yaml] people list",
@@ -1033,6 +1159,56 @@ function loadOrExit(configPath: string) {
     }
     throw error;
   }
+}
+
+function configString(
+  section: unknown,
+  key: string,
+  fallback: string
+): string {
+  if (!section || typeof section !== "object" || Array.isArray(section)) {
+    return fallback;
+  }
+  const value = (section as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : fallback;
+}
+
+function createSmokeTestRequest(
+  config: ReturnType<typeof loadCompanyConfig>,
+  root: string,
+  state: ReturnType<typeof loadRuntimeState>,
+  projectId: string,
+  projectName: string,
+  lanes: string[]
+): { taskId: string | null; threadId: string | null; assigneeId: string | null } {
+  const smokeTest = createProjectSmokeTestRequest(projectName);
+  if (lanes.includes("planning")) {
+    const intake = intakeRequest(config, root, state, {
+      title: smokeTest.title,
+      body: smokeTest.description,
+      projectId,
+      lane: "planning"
+    });
+    return {
+      taskId: intake.task.id,
+      threadId: intake.thread.id,
+      assigneeId: intake.assignedAgentId
+    };
+  }
+
+  const lane = lanes[0] ?? "build";
+  const task = createTask(state, {
+    projectId,
+    title: smokeTest.title,
+    description: smokeTest.description,
+    lane
+  });
+  const assignment = autoAssignTask(config, root, state, task.id);
+  return {
+    taskId: task.id,
+    threadId: null,
+    assigneeId: assignment.agentId
+  };
 }
 
 process.exitCode = main();
